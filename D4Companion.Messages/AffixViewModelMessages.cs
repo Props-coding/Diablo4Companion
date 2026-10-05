@@ -15,6 +15,20 @@ namespace D4Companion.Messages
         public string PresetName { get; set; } = string.Empty;
     }
 
+    /// <summary>
+    /// Published by AffixViewModel whenever the selected affix preset (build) changes.
+    /// </summary>
+    public class SelectedAffixPresetUpdatedMessage(AffixPresetChangedMessageParams affixPresetChangedMessageParams) : ValueChangedMessage<AffixPresetChangedMessageParams>(affixPresetChangedMessageParams)
+    {
+    }
+
+    /// <summary>
+    /// Asks AffixViewModel to select the preset with the given name. AffixViewModel stays the owner of the selection.
+    /// </summary>
+    public class SelectAffixPresetRequestMessage(AffixPresetChangedMessageParams affixPresetChangedMessageParams) : ValueChangedMessage<AffixPresetChangedMessageParams>(affixPresetChangedMessageParams)
+    {
+    }
+
     public class ToggleOverlayFromGUIMessage(ToggleOverlayFromGUIMessageParams toggleOverlayFromGUIMessageParams) : ValueChangedMessage<ToggleOverlayFromGUIMessageParams>(toggleOverlayFromGUIMessageParams)
     {
     }

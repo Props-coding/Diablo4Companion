@@ -1,0 +1,27 @@
+name: Build and test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the app
+        run: dotnet build D4Companion.sln --configuration Release
+
+      - name: Run crafting tests
+        run: dotnet test D4Companion.Crafting.Tests --configuration Release --no-build

@@ -50,7 +50,12 @@ namespace D4Companion.Services
         #region Properties
 
         public List<Release> Releases { get => _releases; set => _releases = value; }
-        public string Repository { get; } = "https://api.github.com/repos/josdemmers/diablo4Companion/releases";
+        /// <summary>
+        /// Releases API used for update checks. Empty in this fork, so it never downloads the original developer's releases.
+        /// Once this fork has its own release process, set it to:
+        /// https://api.github.com/repos/Props-coding/Diablo4Companion/releases
+        /// </summary>
+        public string Repository { get; } = string.Empty;
         public bool UpdateAvailable { get => _updateAvailable; set => _updateAvailable = value; }
 
         #endregion
@@ -69,7 +74,11 @@ namespace D4Companion.Services
         {
             try
             {
-                if (_settingsManager.Settings.CheckForUpdates) 
+                if (string.IsNullOrWhiteSpace(Repository))
+                {
+                    _logger.LogInformation("Update checks are turned off in this build because no release source is configured.");
+                }
+                else if (_settingsManager.Settings.CheckForUpdates) 
                 {
                     _logger.LogInformation($"Updating release info from: {Repository}");
 

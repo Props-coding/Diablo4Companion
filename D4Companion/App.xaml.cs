@@ -1,5 +1,6 @@
 ﻿using D4Companion.Interfaces;
 using D4Companion.Services;
+using D4Companion.State;
 using D4Companion.ViewModels;
 using MahApps.Metro.Controls.Dialogs;
 using Microsoft.Extensions.DependencyInjection;
@@ -102,7 +103,14 @@ namespace D4Companion
             services.AddSingleton<ISystemPresetManager, SystemPresetManager>();
             services.AddSingleton<ITradeItemManager, TradeItemManager>();
 
+            // Shared state for Overview, My Gear and Crafting Advisor
+            services.AddSingleton<CompanionState>();
+
             // ViewModels
+            // Singletons: the companion screens and the compact view share one instance each.
+            services.AddSingleton<CraftingViewModel>();
+            services.AddSingleton<GearViewModel>();
+            services.AddSingleton<OverviewViewModel>();
             services.AddTransient<AffixViewModel>();
             services.AddTransient<DebugViewModel>();
             services.AddTransient<LoggingViewModel>();

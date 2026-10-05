@@ -1,0 +1,268 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!--
+        Sanctuary Dark palette.
+        Charcoal and obsidian surfaces, restrained crimson for primary actions,
+        muted antique gold accents and readable off-white text.
+    -->
+
+    <!-- Colors -->
+    <Color x:Key="Companion.Color.Obsidian">#0E0E10</Color>
+    <Color x:Key="Companion.Color.Charcoal">#151518</Color>
+    <Color x:Key="Companion.Color.Surface">#1B1B1F</Color>
+    <Color x:Key="Companion.Color.SurfaceRaised">#232328</Color>
+    <Color x:Key="Companion.Color.Border">#2E2E34</Color>
+    <Color x:Key="Companion.Color.Crimson">#9E1F28</Color>
+    <Color x:Key="Companion.Color.CrimsonHover">#B8272F</Color>
+    <Color x:Key="Companion.Color.Gold">#B89A62</Color>
+    <Color x:Key="Companion.Color.Text">#ECE7DF</Color>
+    <Color x:Key="Companion.Color.TextMuted">#A29D94</Color>
+    <Color x:Key="Companion.Color.TextFaint">#6F6B65</Color>
+    <Color x:Key="Companion.Color.Success">#6FAE78</Color>
+    <Color x:Key="Companion.Color.Warning">#D4A84B</Color>
+    <Color x:Key="Companion.Color.Danger">#D2575C</Color>
+    <Color x:Key="Companion.Color.Info">#7F9CC0</Color>
+
+    <!-- Brushes -->
+    <SolidColorBrush x:Key="Companion.Brush.Obsidian" Color="{StaticResource Companion.Color.Obsidian}" />
+    <SolidColorBrush x:Key="Companion.Brush.Charcoal" Color="{StaticResource Companion.Color.Charcoal}" />
+    <SolidColorBrush x:Key="Companion.Brush.Surface" Color="{StaticResource Companion.Color.Surface}" />
+    <SolidColorBrush x:Key="Companion.Brush.SurfaceRaised" Color="{StaticResource Companion.Color.SurfaceRaised}" />
+    <SolidColorBrush x:Key="Companion.Brush.Border" Color="{StaticResource Companion.Color.Border}" />
+    <SolidColorBrush x:Key="Companion.Brush.Crimson" Color="{StaticResource Companion.Color.Crimson}" />
+    <SolidColorBrush x:Key="Companion.Brush.CrimsonHover" Color="{StaticResource Companion.Color.CrimsonHover}" />
+    <SolidColorBrush x:Key="Companion.Brush.Gold" Color="{StaticResource Companion.Color.Gold}" />
+    <SolidColorBrush x:Key="Companion.Brush.Text" Color="{StaticResource Companion.Color.Text}" />
+    <SolidColorBrush x:Key="Companion.Brush.TextMuted" Color="{StaticResource Companion.Color.TextMuted}" />
+    <SolidColorBrush x:Key="Companion.Brush.TextFaint" Color="{StaticResource Companion.Color.TextFaint}" />
+    <SolidColorBrush x:Key="Companion.Brush.Success" Color="{StaticResource Companion.Color.Success}" />
+    <SolidColorBrush x:Key="Companion.Brush.Warning" Color="{StaticResource Companion.Color.Warning}" />
+    <SolidColorBrush x:Key="Companion.Brush.Danger" Color="{StaticResource Companion.Color.Danger}" />
+    <SolidColorBrush x:Key="Companion.Brush.Info" Color="{StaticResource Companion.Color.Info}" />
+    <SolidColorBrush x:Key="Companion.Brush.SuccessSoft" Color="#1F6FAE78" />
+    <SolidColorBrush x:Key="Companion.Brush.WarningSoft" Color="#1FD4A84B" />
+    <SolidColorBrush x:Key="Companion.Brush.DangerSoft" Color="#1FD2575C" />
+    <SolidColorBrush x:Key="Companion.Brush.InfoSoft" Color="#1F7F9CC0" />
+    <SolidColorBrush x:Key="Companion.Brush.GoldSoft" Color="#1AB89A62" />
+
+    <!-- Typography -->
+    <FontFamily x:Key="Companion.Font">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="Companion.Font.Display">Segoe UI Variable Display, Segoe UI Semibold, Segoe UI</FontFamily>
+    <sys:Double x:Key="Companion.FontSize.Body">14</sys:Double>
+
+    <Style x:Key="Companion.Text" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Companion.Font}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Text}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="Companion.Text.Muted" TargetType="TextBlock" BasedOn="{StaticResource Companion.Text}">
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.TextMuted}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <Style x:Key="Companion.Text.Eyebrow" TargetType="TextBlock" BasedOn="{StaticResource Companion.Text}">
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Gold}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="Companion.Text.PageTitle" TargetType="TextBlock" BasedOn="{StaticResource Companion.Text}">
+        <Setter Property="FontFamily" Value="{StaticResource Companion.Font.Display}" />
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="Companion.Text.CardTitle" TargetType="TextBlock" BasedOn="{StaticResource Companion.Text}">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="Companion.Text.Headline" TargetType="TextBlock" BasedOn="{StaticResource Companion.Text}">
+        <Setter Property="FontFamily" Value="{StaticResource Companion.Font.Display}" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Surfaces -->
+    <Style x:Key="Companion.Card" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.Surface}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="18" />
+    </Style>
+
+    <Style x:Key="Companion.Callout.Warning" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.WarningSoft}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Warning}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="12,10" />
+    </Style>
+
+    <Style x:Key="Companion.Callout.Info" TargetType="Border" BasedOn="{StaticResource Companion.Callout.Warning}">
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Border}" />
+    </Style>
+
+    <Style x:Key="Companion.GoldRule" TargetType="Border">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00B89A62" Offset="0" />
+                    <GradientStop Color="#99B89A62" Offset="0.15" />
+                    <GradientStop Color="#00B89A62" Offset="1" />
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Buttons -->
+    <Style x:Key="Companion.Button.Base" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource Companion.Font}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Text}" />
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="16,8" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="Companion.Button.Primary" TargetType="Button" BasedOn="{StaticResource Companion.Button.Base}">
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.Crimson}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Crimson}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.CrimsonHover}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="Companion.Button.Secondary" TargetType="Button" BasedOn="{StaticResource Companion.Button.Base}" />
+
+    <Style x:Key="Companion.Button.Link" TargetType="Button" BasedOn="{StaticResource Companion.Button.Base}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="4,2" />
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Gold}" />
+    </Style>
+
+    <!-- Navigation -->
+    <Style x:Key="Companion.NavButton" TargetType="RadioButton">
+        <Setter Property="FontFamily" Value="{StaticResource Companion.Font}" />
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.TextMuted}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Margin" Value="10,2" />
+        <Setter Property="GroupName" Value="CompanionNavigation" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="12,10">
+                        <Grid>
+                            <Border x:Name="Marker" Width="3" HorizontalAlignment="Left" Margin="-12,2,0,2"
+                                    CornerRadius="2" Background="{StaticResource Companion.Brush.Crimson}" Visibility="Hidden" />
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+                            <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Text}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+                            <Setter TargetName="Marker" Property="Visibility" Value="Visible" />
+                            <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Text}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="Companion.NavButton.Small" TargetType="RadioButton" BasedOn="{StaticResource Companion.NavButton}">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- Status pills. The DataContext must expose a Status property of type D4Companion.Crafting.AffixStatus. -->
+    <Style x:Key="Companion.StatusPill" TargetType="Border">
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="10,2" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.InfoSoft}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Info}" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Info}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Status}" Value="Match">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.SuccessSoft}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Success}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Success}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}" Value="Missing">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.DangerSoft}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Danger}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Danger}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}" Value="BelowMinimum">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.WarningSoft}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Warning}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}" Value="GreaterNeeded">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Gold}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}" Value="Review">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.WarningSoft}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Warning}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Warning}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}" Value="Unknown">
+                <Setter Property="Background" Value="{StaticResource Companion.Brush.DangerSoft}" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Danger}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Danger}" />
+            </DataTrigger>
+            <DataTrigger Binding="{Binding Status}" Value="{x:Null}">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Inputs use the MahApps dark styles so they stay consistent with the original pages. -->
+
+</ResourceDictionary>

@@ -82,6 +82,7 @@ namespace D4Companion.ViewModels
             WeakReferenceMessenger.Default.Register<AffixPresetAddedMessage>(this, HandleAffixPresetAddedMessage);
             WeakReferenceMessenger.Default.Register<AffixPresetRemovedMessage>(this, HandleAffixPresetRemovedMessage);
             WeakReferenceMessenger.Default.Register<ApplicationLoadedMessage>(this, HandleApplicationLoadedMessage);
+            WeakReferenceMessenger.Default.Register<SelectAffixPresetRequestMessage>(this, HandleSelectAffixPresetRequestMessage);
             WeakReferenceMessenger.Default.Register<SelectedAffixesChangedMessage>(this, HandleSelectedAffixesChangedMessage);
             WeakReferenceMessenger.Default.Register<SelectedAspectsChangedMessage>(this, HandleSelectedAspectsChangedMessage);
             WeakReferenceMessenger.Default.Register<SelectedSigilsChangedMessage>(this, HandleSelectedSigilsChangedMessage);
@@ -381,6 +382,11 @@ namespace D4Companion.ViewModels
                 UpdateSelectedSigils();
                 UpdateSelectedUniques();
                 UpdateSelectedRunes();
+
+                WeakReferenceMessenger.Default.Send(new SelectedAffixPresetUpdatedMessage(new AffixPresetChangedMessageParams
+                {
+                    PresetName = _selectedAffixPreset.Name
+                }));
             }
         }
 
@@ -746,6 +752,20 @@ namespace D4Companion.ViewModels
         private void HandleSelectedRunesChangedMessage(object recipient, SelectedRunesChangedMessage message)
         {
             UpdateSelectedRunes();
+        }
+
+        private void HandleSelectAffixPresetRequestMessage(object recipient, SelectAffixPresetRequestMessage message)
+        {
+            var preset = AffixPresets.FirstOrDefault(p => p.Name.Equals(message.Value.PresetName));
+            if (preset == null || preset == SelectedAffixPreset) return;
+
+            SelectedAffixPreset = preset;
+
+            // Same notification as switching presets with the hotkey, so overlays update too.
+            WeakReferenceMessenger.Default.Send(new AffixPresetChangedMessage(new AffixPresetChangedMessageParams
+            {
+                PresetName = preset.Name
+            }));
         }
 
         private void HandleSwitchPresetKeyBindingMessage(object recipient, SwitchPresetKeyBindingMessage message)

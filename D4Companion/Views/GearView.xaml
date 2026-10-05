@@ -1,0 +1,124 @@
+<UserControl
+    x:Class="D4Companion.Views.GearView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="clr-namespace:D4Companion.ViewModels"
+    xmlns:converters="clr-namespace:D4Companion.Converters"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=viewModels:GearViewModel}"
+    d:DesignHeight="700" d:DesignWidth="1100">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!-- Same colors as the affix status pills, keyed on the item verdict. -->
+        <Style x:Key="VerdictPill" TargetType="Border" BasedOn="{StaticResource Companion.StatusPill}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Verdict}" Value="MeetsTarget">
+                    <Setter Property="Background" Value="{StaticResource Companion.Brush.SuccessSoft}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Success}" />
+                    <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Success}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Verdict}" Value="NeedsWork">
+                    <Setter Property="Background" Value="{StaticResource Companion.Brush.DangerSoft}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Danger}" />
+                    <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Danger}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Verdict}" Value="NeedsCorrection">
+                    <Setter Property="Background" Value="{StaticResource Companion.Brush.WarningSoft}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Warning}" />
+                    <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Warning}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Verdict}" Value="NotConfirmed">
+                    <Setter Property="Background" Value="{StaticResource Companion.Brush.WarningSoft}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Warning}" />
+                    <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Warning}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="MY GEAR" Style="{StaticResource Companion.Text.Eyebrow}" />
+                <TextBlock Text="Gear review" Style="{StaticResource Companion.Text.PageTitle}" Margin="0,2,0,0" />
+                <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,4,0,0">
+                    <Run Text="Saved items compared with " /><Run Text="{Binding BuildName, Mode=OneWay}" Foreground="{StaticResource Companion.Brush.Gold}" />
+                </TextBlock>
+            </StackPanel>
+            <Button Grid.Column="1" Content="Scan a new item" Command="{Binding ScanNewCommand}" Style="{StaticResource Companion.Button.Primary}" VerticalAlignment="Center" />
+        </Grid>
+
+        <Border Grid.Row="1" Style="{StaticResource Companion.Callout.Warning}" Margin="0,0,0,16"
+                Visibility="{Binding HasLoadWarning, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding LoadWarning}" Style="{StaticResource Companion.Text}" Foreground="{StaticResource Companion.Brush.Warning}" />
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource Companion.Card}" Padding="0">
+            <Grid>
+                <TextBlock Text="No saved items yet. Capture a scan in the Crafting Advisor and choose Save to My Gear."
+                           Style="{StaticResource Companion.Text.Muted}" Margin="18"
+                           Visibility="{Binding HasItems, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
+
+                <DockPanel Visibility="{Binding HasItems, Converter={StaticResource BoolToVisibility}}">
+                    <Grid DockPanel.Dock="Top" Margin="18,14,18,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="160" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Slot" Style="{StaticResource Companion.Text.Muted}" />
+                        <TextBlock Grid.Column="1" Text="Item" Style="{StaticResource Companion.Text.Muted}" />
+                        <TextBlock Grid.Column="2" Text="Build match" Style="{StaticResource Companion.Text.Muted}" />
+                        <TextBlock Grid.Column="3" Text="Next action" Style="{StaticResource Companion.Text.Muted}" />
+                    </Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,1,0,0" Padding="18,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="160" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="200" />
+                                                <ColumnDefinition Width="220" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Title}" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Details}" Style="{StaticResource Companion.Text.Muted}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                            <Border Grid.Column="2" Style="{StaticResource VerdictPill}">
+                                                <TextBlock Text="{Binding BuildMatch}" FontSize="12" />
+                                            </Border>
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                                <Button Content="{Binding NextAction}" Style="{StaticResource Companion.Button.Secondary}" MinWidth="140"
+                                                        Command="{Binding DataContext.OpenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" ToolTip="Open in the Crafting Advisor" />
+                                                <Button Content="Delete" Style="{StaticResource Companion.Button.Link}" Foreground="{StaticResource Companion.Brush.TextMuted}" Margin="8,0,0,0"
+                                                        Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
