@@ -42,8 +42,9 @@
             </StackPanel>
         </Grid>
 
-        <!-- Next action: always visible -->
-        <Border Grid.Row="1" Style="{StaticResource Companion.ActionBar}" Margin="0,0,0,16">
+        <!-- Next action before the item is confirmed. Afterwards the Next action card on the right takes over. -->
+        <Border Grid.Row="1" Style="{StaticResource Companion.ActionBar}" Margin="0,0,0,16"
+                Visibility="{Binding ShowNextActionBar, Converter={StaticResource BoolToVisibility}}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -269,6 +270,32 @@
                                 </ItemsControl>
                             </Border>
 
+                            <!-- Crafting limits: what the player knows the item can no longer take. -->
+                            <Expander Style="{StaticResource Companion.Expander}" Margin="0,12,0,0"
+                                      Visibility="{Binding HasItem, Converter={StaticResource BoolToVisibility}}">
+                                <Expander.Header>
+                                    <TextBlock Style="{StaticResource Companion.Text}">
+                                        <Run Text="Crafting limits" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding CraftLimitsSummary, Mode=OneWay}" Foreground="{StaticResource Companion.Brush.TextMuted}" FontSize="12" />
+                                    </TextBlock>
+                                </Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="Tell the advisor what this item can no longer take, so it never suggests a step the game will refuse."
+                                               Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,0,0,8" />
+                                    <CheckBox IsChecked="{Binding CannotBeModified}" Margin="0,2">
+                                        <TextBlock Text="Can't be changed any more" Style="{StaticResource Companion.Text}" />
+                                    </CheckBox>
+                                    <CheckBox IsChecked="{Binding NoTempersLeft}" Margin="0,2">
+                                        <TextBlock Text="No tempers left" Style="{StaticResource Companion.Text}" />
+                                    </CheckBox>
+                                    <CheckBox IsChecked="{Binding FullyMasterworked}" Margin="0,2">
+                                        <TextBlock Text="Fully masterworked" Style="{StaticResource Companion.Text}" />
+                                    </CheckBox>
+                                    <TextBlock Text="Enchanted affix (the Occultist allows one per item)" Style="{StaticResource Companion.Text.Muted}" Margin="0,8,0,4" />
+                                    <ComboBox ItemsSource="{Binding EnchantOptions}" SelectedItem="{Binding SelectedEnchant, Mode=TwoWay}"
+                                              DisplayMemberPath="Name" Width="280" HorizontalAlignment="Left" />
+                                </StackPanel>
+                            </Expander>
+
                             <!-- Footer -->
                             <Grid Margin="0,14,0,0" Visibility="{Binding HasItem, Converter={StaticResource BoolToVisibility}}">
                                 <Grid.ColumnDefinitions>
@@ -297,6 +324,9 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+
+                    <!-- The full plan, with room to read it -->
+                    <local:CraftingPlanCard Margin="0,0,0,16" />
 
                     <!-- Details, folded away -->
                     <Border Style="{StaticResource Companion.Card}" Padding="18,6" Margin="0,0,0,16">

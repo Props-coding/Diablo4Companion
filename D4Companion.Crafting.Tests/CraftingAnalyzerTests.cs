@@ -60,7 +60,7 @@ namespace D4Companion.Crafting.Tests
             Assert.That(result.MatchesBuild, Is.True);
             Assert.That(result.Recommendation.Kind, Is.EqualTo(RecommendationKind.KeepItem));
             Assert.That(result.Recommendation.ReplaceCandidate, Is.Null);
-            Assert.That(result.Recommendation.Summary, Does.Contain("no need to spend").IgnoreCase);
+            Assert.That(result.Recommendation.Summary, Does.Contain("target affixes matched"));
         }
 
         [Test]

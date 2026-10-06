@@ -10,15 +10,32 @@
     d:DesignHeight="800" d:DesignWidth="340">
 
     <!-- Shared by the Crafting Advisor page and the compact second-monitor view. DataContext: CraftingViewModel.
-         Leads with one action and the target stat. Everything else is folded away. -->
+         A short Next action card: one instruction and the Rescan button. The reasoning is folded away; the full plan sits under the item. -->
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </UserControl.Resources>
 
     <Border Style="{StaticResource Companion.Card}">
         <StackPanel>
-            <TextBlock Text="RECOMMENDATION" Style="{StaticResource Companion.Text.Eyebrow}" />
+            <TextBlock Text="NEXT ACTION" Style="{StaticResource Companion.Text.Eyebrow}" />
             <TextBlock Text="{Binding Headline}" Style="{StaticResource Companion.Text.Headline}" Margin="0,6,0,0" />
+
+            <!-- The one instruction: where, which prism, what to aim for. The reasoning is folded away below. -->
+            <StackPanel Margin="0,8,0,0" Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding InstructionPlace}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding InstructionPrism}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
+                              ItemsPanel="{StaticResource Companion.WrapPanel}" Margin="0,4,0,0"
+                              Visibility="{Binding HasInstructionPrism, Converter={StaticResource BoolToVisibility}}" />
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding HasInstructionDesired, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Aim for" Style="{StaticResource Companion.Text.Muted}" VerticalAlignment="Center" />
+                    <Border Style="{StaticResource Companion.Tag.Gold}" Padding="10,3">
+                        <TextBlock Text="{Binding InstructionDesired}" FontSize="13" FontWeight="SemiBold" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" Margin="0,10,0,0"
+                       Visibility="{Binding ShowSummary, Converter={StaticResource BoolToVisibility}}" />
 
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0" Visibility="{Binding ShowTargetTag, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Text="Aim for" Style="{StaticResource Companion.Text.Muted}" VerticalAlignment="Center" />
@@ -27,92 +44,55 @@
                 </Border>
             </StackPanel>
 
-            <TextBlock Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" Margin="0,10,0,0" />
-
-            <!-- The concrete step: where, what, which prism, on which affix, and why. -->
+            <!-- After crafting, rescanning is the main thing to do. Saving stays secondary. -->
             <Border Style="{StaticResource Companion.Callout.Info}" Margin="0,12,0,0" Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Text="WHAT TO DO" Style="{StaticResource Companion.Text.Eyebrow}" />
-                    <Grid Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" SharedSizeGroup="InstructionLabel" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" Text="Where" Style="{StaticResource Companion.Text.Muted}" Margin="0,0,12,6" />
-                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding InstructionStation}" Style="{StaticResource Companion.Text}" Margin="0,0,0,6" />
-
-                        <TextBlock Grid.Row="1" Text="Operation" Style="{StaticResource Companion.Text.Muted}" Margin="0,0,12,6" />
-                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding InstructionOperation}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" Margin="0,0,0,6" />
-
-                        <TextBlock Grid.Row="2" Text="Prism" Style="{StaticResource Companion.Text.Muted}" Margin="0,0,12,6"
-                                   Visibility="{Binding HasInstructionPrism, Converter={StaticResource BoolToVisibility}}" />
-                        <ItemsControl Grid.Row="2" Grid.Column="1" ItemsSource="{Binding InstructionPrism}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
-                                      ItemsPanel="{StaticResource Companion.WrapPanel}" Margin="0,0,0,4"
-                                      Visibility="{Binding HasInstructionPrism, Converter={StaticResource BoolToVisibility}}" />
-
-                        <TextBlock Grid.Row="3" Text="Change" Style="{StaticResource Companion.Text.Muted}" Margin="0,0,12,6"
-                                   Visibility="{Binding HasInstructionAffected, Converter={StaticResource BoolToVisibility}}" />
-                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding InstructionAffected}" Style="{StaticResource Companion.Text}" Margin="0,0,0,6"
-                                   Visibility="{Binding HasInstructionAffected, Converter={StaticResource BoolToVisibility}}" />
-
-                        <TextBlock Grid.Row="4" Text="Aim for" Style="{StaticResource Companion.Text.Muted}" Margin="0,0,12,0"
-                                   Visibility="{Binding HasInstructionDesired, Converter={StaticResource BoolToVisibility}}" />
-                        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding InstructionDesired}" Style="{StaticResource Companion.Text}" Foreground="{StaticResource Companion.Brush.Gold}"
-                                   Visibility="{Binding HasInstructionDesired, Converter={StaticResource BoolToVisibility}}" />
-                    </Grid>
-                    <TextBlock Text="Why" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" Margin="0,10,0,2" />
-                    <TextBlock Text="{Binding InstructionReason}" Style="{StaticResource Companion.Text.Muted}" />
-                    <TextBlock Text="{Binding InstructionCaveat}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,8,0,0"
-                               Foreground="{StaticResource Companion.Brush.Warning}"
-                               Visibility="{Binding HasInstructionCaveat, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Text="Craft in game, then hover the item and rescan." Style="{StaticResource Companion.Text}" FontSize="13" />
+                    <Button Content="Rescan item" Command="{Binding RescanAfterCraftingCommand}" Style="{StaticResource Companion.Button.Primary}"
+                            HorizontalAlignment="Left" Margin="0,8,0,0"
+                            ToolTip="Hover over the crafted item in-game first. The new scan replaces the old one and the plan updates." />
                 </StackPanel>
             </Border>
+            <Button Command="{Binding SaveCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    Visibility="{Binding ShowSaveAction, Converter={StaticResource BoolToVisibility}}"
+                    ToolTip="Saves this item to My Gear without crafting. Rescanning saves it too.">
+                <TextBlock Text="Save to My Gear" FontSize="12" />
+            </Button>
 
             <StackPanel Visibility="{Binding ShowRecommendation, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
 
-                <!-- Every step for this item, each assuming the one before it worked. -->
-                <Expander Style="{StaticResource Companion.Expander}" IsExpanded="True" Header="{Binding PlanHeader}"
-                          Visibility="{Binding HasPlan, Converter={StaticResource BoolToVisibility}}">
+                <!-- Why this step: what was checked, and what only the game can confirm. -->
+                <Expander Style="{StaticResource Companion.Expander}" Header="Why this step"
+                          Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
-                        <ItemsControl ItemsSource="{Binding PlanSteps}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Margin="0,0,0,12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,10,0" VerticalAlignment="Top" BorderThickness="1"
-                                                Background="{StaticResource Companion.Brush.GoldSoft}" BorderBrush="{StaticResource Companion.Brush.Gold}">
-                                            <TextBlock Text="{Binding Number}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Gold}"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        </Border>
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="{Binding Operation}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
-                                            <ItemsControl ItemsSource="{Binding Prism}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
-                                                          ItemsPanel="{StaticResource Companion.WrapPanel}"
-                                                          Visibility="{Binding HasPrism, Converter={StaticResource BoolToVisibility}}" />
-                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Companion.Text.Muted}" />
-                                            <TextBlock Style="{StaticResource Companion.Text.Muted}" Visibility="{Binding HasAimFor, Converter={StaticResource BoolToVisibility}}">
-                                                <Run Text="Aim for " /><Run Text="{Binding AimFor, Mode=OneWay}" Foreground="{StaticResource Companion.Brush.Gold}" />
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding IfItWorks}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,2,0,0" />
-                                        </StackPanel>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <TextBlock Text="{Binding PlanEndNote}" Style="{StaticResource Companion.Text}" FontSize="13"
-                                   Visibility="{Binding HasPlanEndNote, Converter={StaticResource BoolToVisibility}}" />
-                        <TextBlock Text="{Binding PlanDisclaimer, Mode=OneWay}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,8,0,0" />
+                        <TextBlock Text="{Binding InstructionReason}" Style="{StaticResource Companion.Text.Muted}" />
+                        <StackPanel Margin="0,10,0,0" Visibility="{Binding HasInstructionChecked, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Checked" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding InstructionChecked}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
+                                            <Run Text="&#x2713;" Foreground="{StaticResource Companion.Brush.Success}" /> <Run Text="{Binding Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <StackPanel Margin="0,10,0,0" Visibility="{Binding HasInstructionConfirm, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Check in-game before you spend" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding InstructionConfirm}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
+                                            <Run Text="?" Foreground="{StaticResource Companion.Brush.Warning}" FontWeight="SemiBold" /> <Run Text="{Binding Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <TextBlock Text="{Binding InstructionCaveat}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,10,0,0"
+                                   Foreground="{StaticResource Companion.Brush.Warning}"
+                                   Visibility="{Binding HasInstructionCaveat, Converter={StaticResource BoolToVisibility}}" />
                     </StackPanel>
                 </Expander>
 

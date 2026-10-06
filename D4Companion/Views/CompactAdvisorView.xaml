@@ -21,7 +21,8 @@
             <TextBlock Text="{Binding LiveScanText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,8,0,0" />
             <Button Content="{Binding ScannerButtonText}" Command="{Binding ToggleScannerCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="0,8,0,0" />
 
-            <Border Style="{StaticResource Companion.ActionBar}" Padding="12,10" Margin="0,10,0,10">
+            <Border Style="{StaticResource Companion.ActionBar}" Padding="12,10" Margin="0,10,0,10"
+                    Visibility="{Binding ShowNextActionBar, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Text="{Binding NextActionTitle}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
                     <TextBlock Text="{Binding NextActionDetail}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,2,0,8" />
@@ -66,6 +67,7 @@
             </Border>
 
             <local:RecommendationPanel />
+            <local:CraftingPlanCard Margin="0,10,0,0" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

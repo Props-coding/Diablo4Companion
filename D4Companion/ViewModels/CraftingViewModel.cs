@@ -46,6 +46,8 @@ namespace D4Companion.ViewModels
         public bool IsFirst => Number == 1;
     }
 
+    public sealed record EnchantOption(string Id, string Name);
+
     public sealed class HistoryRowViewModel
     {
         public string Label { get; init; } = string.Empty;
@@ -85,6 +87,7 @@ namespace D4Companion.ViewModels
         private DateTime _capturedAtUtc = DateTime.UtcNow;
         private bool _isEditing;
         private bool _includeGreaterAffixes;
+        private ItemCraftState _craftState = new();
 
         public CraftingViewModel(ILogger<CraftingViewModel> logger, CompanionState state)
         {
@@ -101,7 +104,7 @@ namespace D4Companion.ViewModels
 
             CaptureScanCommand = new RelayCommand(CaptureScan, () => _state.LiveScan != null);
             ToggleScannerCommand = new RelayCommand(() => _state.SetScanner(!_state.IsScannerOn));
-            RescanAfterCraftingCommand = new RelayCommand(RescanAfterCrafting, () => _state.LiveScan != null && _currentRecordId != null);
+            RescanAfterCraftingCommand = new RelayCommand(RescanAfterCrafting, () => _state.LiveScan != null && HasItem);
             ConfirmCommand = new RelayCommand(Confirm, () => HasItem);
             SaveCommand = new RelayCommand(Save, () => HasItem);
             AddAffixCommand = new RelayCommand(AddAffix, () => HasItem);
@@ -372,6 +375,82 @@ namespace D4Companion.ViewModels
             OnPropertyChanged(nameof(ShowRescanAction));
         }
 
+        // Crafting limits: what the player told us the item can no longer take.
+
+        public bool CannotBeModified
+        {
+            get => _craftState.CannotBeModified;
+            set => SetCraftState(_craftState with { CannotBeModified = value });
+        }
+
+        public bool NoTempersLeft
+        {
+            get => _craftState.NoTempersLeft;
+            set => SetCraftState(_craftState with { NoTempersLeft = value });
+        }
+
+        public bool FullyMasterworked
+        {
+            get => _craftState.FullyMasterworked;
+            set => SetCraftState(_craftState with { FullyMasterworked = value });
+        }
+
+        public ObservableCollection<EnchantOption> EnchantOptions { get; } = new();
+
+        public EnchantOption? SelectedEnchant
+        {
+            get => EnchantOptions.FirstOrDefault(o => string.Equals(o.Id, _craftState.EnchantedAffixId, StringComparison.OrdinalIgnoreCase))
+                   ?? EnchantOptions.FirstOrDefault();
+            set
+            {
+                if (value == null) return;
+                SetCraftState(_craftState with { EnchantedAffixId = value.Id });
+            }
+        }
+
+        public string CraftLimitsSummary
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (_craftState.CannotBeModified) parts.Add("can't be changed");
+                if (_craftState.HasEnchant) parts.Add("enchant used on " + LookupName(_craftState.EnchantedAffixId));
+                if (_craftState.NoTempersLeft) parts.Add("no tempers left");
+                if (_craftState.FullyMasterworked) parts.Add("fully masterworked");
+                return parts.Count == 0 ? "None marked" : string.Join(", ", parts);
+            }
+        }
+
+        private void SetCraftState(ItemCraftState state)
+        {
+            if (state == _craftState) return;
+            _craftState = state;
+            HasUnsavedChanges = true;
+            OnCraftStateChanged();
+            Analyze();
+        }
+
+        private void OnCraftStateChanged()
+        {
+            OnPropertyChanged(nameof(CannotBeModified));
+            OnPropertyChanged(nameof(NoTempersLeft));
+            OnPropertyChanged(nameof(FullyMasterworked));
+            OnPropertyChanged(nameof(SelectedEnchant));
+            OnPropertyChanged(nameof(CraftLimitsSummary));
+        }
+
+        private void RefreshEnchantOptions()
+        {
+            EnchantOptions.Clear();
+            EnchantOptions.Add(new EnchantOption(string.Empty, "No affix enchanted yet"));
+            foreach (var row in Affixes.Where(a => !string.IsNullOrWhiteSpace(a.AffixId)))
+            {
+                if (EnchantOptions.Any(o => string.Equals(o.Id, row.AffixId, StringComparison.OrdinalIgnoreCase))) continue;
+                EnchantOptions.Add(new EnchantOption(row.AffixId, LookupName(row.AffixId)));
+            }
+            OnPropertyChanged(nameof(SelectedEnchant));
+        }
+
         // Recommendation
 
         public bool ShowRecommendation => IsConfirmed && _analysis != null && _analysis.Verdict != CraftingVerdict.NotConfirmed;
@@ -400,6 +479,21 @@ namespace D4Companion.ViewModels
         public bool HasInstructionPrism => InstructionPrism.Count > 0;
         public string InstructionReason => Instruction?.Reason ?? string.Empty;
         public string InstructionCaveat => Instruction?.Caveat ?? string.Empty;
+        public IReadOnlyList<string> InstructionChecked => Instruction?.Checked ?? Array.Empty<string>();
+        public bool HasInstructionChecked => InstructionChecked.Count > 0;
+        public IReadOnlyList<string> InstructionConfirm => Instruction?.ConfirmInGame ?? Array.Empty<string>();
+        public bool HasInstructionConfirm => InstructionConfirm.Count > 0;
+        public string InstructionPlace => Instruction == null ? string.Empty : $"At the {Instruction.Station}";
+
+        // Kept separate: having the target affixes is not the same as meeting every requirement.
+        public string AffixesStatement => ShowRecommendation ? _analysis?.AffixesStatement ?? string.Empty : string.Empty;
+        public string ValuesStatement => ShowRecommendation ? _analysis?.ValuesStatement ?? string.Empty : string.Empty;
+        public string GreaterStatement => ShowRecommendation ? _analysis?.GreaterStatement ?? string.Empty : string.Empty;
+        public bool HasCompletion => AffixesStatement.Length > 0;
+        public bool HasPlanCard => HasPlan || HasCompletion;
+        /// <summary>Summary under the headline, only when there is no step to show (the step says it already).</summary>
+        public bool ShowSummary => !HasInstruction;
+        public bool ShowNextActionBar => !ShowRecommendation;
         public bool HasInstructionCaveat => InstructionCaveat.Length > 0;
 
         public string ProtectedText => Join(_analysis?.Recommendation.Protected);
@@ -472,7 +566,14 @@ namespace D4Companion.ViewModels
         private void RescanAfterCrafting()
         {
             var live = _state.LiveScan;
-            if (live == null || _currentRecordId == null) return;
+            if (live == null || !HasItem) return;
+
+            // Rescanning needs a saved item to compare with. Save it first when it isn't saved yet.
+            if (_currentRecordId == null || HasUnsavedChanges)
+            {
+                Save();
+                if (_currentRecordId == null || HasUnsavedChanges) return;
+            }
 
             var record = _state.Store.Find(_currentRecordId.Value);
             if (record == null) return;
@@ -483,19 +584,63 @@ namespace D4Companion.ViewModels
                 return;
             }
 
-            // Carry over Keep marks for affixes that are still on the item.
+            var before = BuildSnapshot(out _);
+            if (SameAffixes(before, live))
+            {
+                StatusMessage = "The scan looks the same as before. Do the step in the game, hover over the item again, then rescan.";
+                return;
+            }
+
+            // Carry over Keep marks for affixes that are still on the item, and the item's crafting limits.
             var kept = Affixes.Where(a => a.IsKeep).Select(a => a.AffixId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var craftState = DetectEnchant(_analysis?.Recommendation, before, live, _craftState, out string enchantNote);
             var snapshot = live with
             {
-                Affixes = live.Affixes.Select(a => a with { IsKeep = kept.Contains(a.AffixId) }).ToList()
+                Affixes = live.Affixes.Select(a => a with { IsKeep = kept.Contains(a.AffixId) }).ToList(),
+                CraftState = craftState
             };
 
             _isAfterCraftingDraft = true;
             LoadSnapshot(snapshot);
             HasUnsavedChanges = true;
-            StatusMessage = "New scan captured after crafting. Check it, confirm it, then save it to keep the history.";
+            StatusMessage = "New scan captured after crafting. Check it and confirm it to get the updated plan." + enchantNote;
             RefreshHistory();
         }
+
+        /// <summary>
+        /// After an enchant step, the Occultist can only change the enchanted affix again.
+        /// Works out which affix that is: the original if it was kept, or the one new affix.
+        /// </summary>
+        private ItemCraftState DetectEnchant(CraftingRecommendation? previous, GearSnapshot before, GearSnapshot after, ItemCraftState state, out string note)
+        {
+            note = string.Empty;
+            if (previous?.Instruction?.Operation != "Enchant" || previous.ReplaceCandidate == null || state.HasEnchant) return state;
+
+            string original = previous.ReplaceCandidate.AffixId;
+            bool stillThere = after.Affixes.Any(a => string.Equals(a.AffixId, original, StringComparison.OrdinalIgnoreCase));
+            if (stillThere && before.Affixes.Select(a => a.AffixId).SequenceEqual(after.Affixes.Select(a => a.AffixId), StringComparer.OrdinalIgnoreCase))
+            {
+                note = $" If you enchanted {LookupName(original)} and kept it, it is now the enchanted affix. Check Crafting limits.";
+                return state with { EnchantedAffixId = original };
+            }
+
+            var added = after.Affixes
+                .Where(a => !before.Affixes.Any(b => string.Equals(b.AffixId, a.AffixId, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            if (added.Count == 1)
+            {
+                note = $" {LookupName(added[0].AffixId)} is marked as the enchanted affix. Change it under Crafting limits if that's wrong.";
+                return state with { EnchantedAffixId = added[0].AffixId };
+            }
+
+            note = " Mark which affix you enchanted under Crafting limits.";
+            return state;
+        }
+
+        private static bool SameAffixes(GearSnapshot a, GearSnapshot b) =>
+            a.Affixes.Count == b.Affixes.Count &&
+            a.Affixes.Zip(b.Affixes).All(p => string.Equals(p.First.AffixId, p.Second.AffixId, StringComparison.OrdinalIgnoreCase)
+                                              && p.First.Value == p.Second.Value && p.First.Kind == p.Second.Kind);
 
         private void Confirm()
         {
@@ -589,6 +734,8 @@ namespace D4Companion.ViewModels
             _itemPowerText = string.Empty;
             _rarity = string.Empty;
             _isUnique = false;
+            _craftState = new ItemCraftState();
+            EnchantOptions.Clear();
             HasItem = false;
             IsEditing = false;
             IsConfirmed = false;
@@ -632,6 +779,9 @@ namespace D4Companion.ViewModels
             _itemPowerText = snapshot.ItemPower > 0 ? snapshot.ItemPower.ToString(CultureInfo.CurrentCulture) : string.Empty;
             _rarity = snapshot.Rarity;
             _isUnique = snapshot.IsUnique;
+            _craftState = snapshot.CraftState ?? new ItemCraftState();
+            RefreshEnchantOptions();
+            OnCraftStateChanged();
             HasItem = true;
             IsConfirmed = false;
             ValidationIssues.Clear();
@@ -660,6 +810,7 @@ namespace D4Companion.ViewModels
         private void OnEdited()
         {
             if (!HasItem) return;
+            RefreshEnchantOptions();
             HasUnsavedChanges = true;
             if (IsConfirmed)
             {
@@ -698,6 +849,7 @@ namespace D4Companion.ViewModels
                 ItemPower = itemPower,
                 Rarity = _rarity,
                 IsUnique = _isUnique,
+                CraftState = _craftState,
                 Affixes = affixes,
                 IsConfirmed = IsConfirmed
             });
@@ -825,7 +977,10 @@ namespace D4Companion.ViewModels
                          nameof(HasInstruction), nameof(ShowTargetTag), nameof(InstructionStation), nameof(InstructionOperation),
                          nameof(InstructionAffected), nameof(HasInstructionAffected), nameof(InstructionDesired), nameof(HasInstructionDesired),
                          nameof(InstructionPrism), nameof(HasInstructionPrism), nameof(InstructionReason),
-                         nameof(InstructionCaveat), nameof(HasInstructionCaveat) })
+                         nameof(InstructionCaveat), nameof(HasInstructionCaveat),
+                         nameof(InstructionChecked), nameof(HasInstructionChecked), nameof(InstructionConfirm), nameof(HasInstructionConfirm),
+                         nameof(InstructionPlace), nameof(AffixesStatement), nameof(ValuesStatement), nameof(GreaterStatement),
+                         nameof(HasCompletion), nameof(HasPlanCard), nameof(ShowSummary), nameof(ShowNextActionBar) })
             {
                 OnPropertyChanged(name);
             }

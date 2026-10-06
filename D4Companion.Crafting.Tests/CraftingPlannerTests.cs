@@ -58,7 +58,7 @@ namespace D4Companion.Crafting.Tests
             Assert.That(plan.Steps.Select(s => s.Instruction.Operation), Is.EqualTo(new[] { "Enchant", "Temper" }));
             Assert.That(plan.Steps[0].IfItWorks, Is.EqualTo("Matches 4 of 5 build affixes."));
             Assert.That(plan.Steps[1].IfItWorks, Is.EqualTo("Matches 5 of 5 build affixes."));
-            Assert.That(plan.EndNote, Does.Contain("Keep it"));
+            Assert.That(plan.EndNote, Is.EqualTo("If every step works: all 5 target affixes matched."));
         }
 
         [Test]
@@ -81,7 +81,7 @@ namespace D4Companion.Crafting.Tests
             var plan = CraftingPlanner.Plan(item, Build(Target("CritChance")));
 
             Assert.That(plan.HasSteps, Is.False);
-            Assert.That(plan.EndNote, Does.Contain("already has everything"));
+            Assert.That(plan.EndNote, Is.EqualTo("The target affix already matched."));
         }
 
         [Test]

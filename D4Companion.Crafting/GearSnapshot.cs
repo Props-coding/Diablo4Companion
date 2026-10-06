@@ -64,6 +64,26 @@ namespace D4Companion.Crafting
         /// </summary>
         public bool IsConfirmed { get; init; }
         public string Note { get; init; } = string.Empty;
+        /// <summary>
+        /// What the player told us about operations that are no longer available on this item.
+        /// The scanner cannot read these from the tooltip.
+        /// </summary>
+        public ItemCraftState CraftState { get; init; } = new();
+    }
+
+    /// <summary>
+    /// Crafting limits of one item, set by the player. Used to block operations the item can no longer take.
+    /// </summary>
+    public sealed record ItemCraftState
+    {
+        /// <summary>The item can't be changed any more, for example after a transfigure.</summary>
+        public bool CannotBeModified { get; init; }
+        /// <summary>The affix that was enchanted at the Occultist. Empty when none has been.</summary>
+        public string EnchantedAffixId { get; init; } = string.Empty;
+        public bool NoTempersLeft { get; init; }
+        public bool FullyMasterworked { get; init; }
+
+        public bool HasEnchant => !string.IsNullOrWhiteSpace(EnchantedAffixId);
     }
 
     /// <summary>
@@ -82,6 +102,10 @@ namespace D4Companion.Crafting
         /// Minimum value from the user's minimal affix value filter. Null when no minimum applies.
         /// </summary>
         public double? MinimumValue { get; init; }
+        /// <summary>
+        /// From the game data: whether this stat can be added by tempering. Null when unknown.
+        /// </summary>
+        public bool? CanBeTempered { get; init; }
         public IReadOnlyList<string> TuningPrisms { get; init; } = Array.Empty<string>();
     }
 

@@ -37,7 +37,11 @@ namespace D4Companion.Crafting
                 var next = Apply(item, step, analysis);
                 if (next == null) break;
 
-                if (step.Station == "Occultist") options = options with { EnchantUsed = true };
+                // The Occultist enchants one affix per item. After this step, only that affix can be enchanted again.
+                if (step.Operation == "Enchant" && step.Goal != null)
+                {
+                    next = next with { CraftState = next.CraftState with { EnchantedAffixId = step.Goal.AffixId } };
+                }
                 item = next;
                 analysis = CraftingAnalyzer.Analyze(item, build, options);
                 steps.Add(new PlanStep(steps.Count + 1, step, $"Matches {analysis.MatchCount} of {analysis.TargetCount} build affixes."));
@@ -46,8 +50,8 @@ namespace D4Companion.Crafting
             string end = analysis.Verdict switch
             {
                 CraftingVerdict.MeetsTarget => steps.Count == 0
-                    ? "This item already has everything your build wants for this slot."
-                    : "After these steps the item would have everything your build wants for this slot. Keep it.",
+                    ? $"{CraftingAnalyzer.AllTargets(analysis.TargetCount)} already matched."
+                    : $"If every step works: {CraftingAnalyzer.AllTargets(analysis.TargetCount).ToLowerInvariant()} matched.",
                 CraftingVerdict.NeedsWork when steps.Count == 0 => analysis.Recommendation.Summary,
                 CraftingVerdict.NeedsWork => $"After these steps: {analysis.Recommendation.Headline}. {analysis.Recommendation.Summary}",
                 _ => string.Empty

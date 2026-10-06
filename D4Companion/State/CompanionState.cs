@@ -159,6 +159,17 @@ namespace D4Companion.State
         public bool IsPercentAffix(string affixId) =>
             !string.IsNullOrWhiteSpace(affixId) && (FindAffixText(affixId)?.IsPercent ?? false);
 
+        /// <summary>
+        /// From the game data: whether this stat can be added by tempering. Null when the affix isn't in the data.
+        /// </summary>
+        public bool? CanBeTempered(string affixId)
+        {
+            if (string.IsNullOrWhiteSpace(affixId)) return null;
+            var affix = _affixManager.Affixes.FirstOrDefault(a => a.IdName.Equals(affixId, StringComparison.OrdinalIgnoreCase))
+                ?? _affixManager.GetAffixInfoByIdName(affixId);
+            return affix?.IsTemperingAvailable;
+        }
+
         public IReadOnlyList<string> GetPrisms(string affixId)
         {
             if (string.IsNullOrWhiteSpace(affixId)) return Array.Empty<string>();
@@ -346,6 +357,7 @@ namespace D4Companion.State
                             IsTempered = a.IsTempered,
                             IsImplicit = a.IsImplicit,
                             MinimumValue = minimum > 0 ? minimum : null,
+                            CanBeTempered = CanBeTempered(a.Id),
                             TuningPrisms = GetPrisms(a.Id)
                         };
                     })

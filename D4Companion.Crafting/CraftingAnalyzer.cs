@@ -66,12 +66,6 @@ namespace D4Companion.Crafting
         /// Greater affixes are valuable, so they are never suggested for replacement unless the player opts in.
         /// </summary>
         public bool IncludeGreaterAffixes { get; init; }
-
-        /// <summary>
-        /// The item already has an enchanted affix, so the Occultist can only change that one.
-        /// Set by the planner after it suggests an enchant.
-        /// </summary>
-        public bool EnchantUsed { get; init; }
     }
 
     /// <summary>
@@ -96,6 +90,10 @@ namespace D4Companion.Crafting
         public string Caveat { get; init; } = string.Empty;
         /// <summary>The build line this step works towards. Used by the planner.</summary>
         public TargetAffix? Goal { get; init; }
+        /// <summary>What the app checked, and where the answer came from (game data or your scan).</summary>
+        public IReadOnlyList<string> Checked { get; init; } = Array.Empty<string>();
+        /// <summary>What only the game can tell you. Check these before spending anything.</summary>
+        public IReadOnlyList<string> ConfirmInGame { get; init; } = Array.Empty<string>();
 
         public string PrismName => PrismId.Length == 0 ? string.Empty : PrismNames.Name(PrismId);
 
@@ -151,6 +149,12 @@ namespace D4Companion.Crafting
         /// Plain statement about build match, kept separate from item quality and damage.
         /// </summary>
         public string BuildMatchStatement { get; init; } = string.Empty;
+        /// <summary>"4 of 4 target affixes on the item". Counts presence only.</summary>
+        public string AffixesStatement { get; init; } = string.Empty;
+        /// <summary>Whether the minimum values your build sets are met.</summary>
+        public string ValuesStatement { get; init; } = string.Empty;
+        /// <summary>Whether the greater affixes your build asks for are present.</summary>
+        public string GreaterStatement { get; init; } = string.Empty;
         public string ItemQualityStatement { get; init; } = CraftingAnalyzer.ItemQualityStatement;
         public string DamageStatement { get; init; } = CraftingAnalyzer.DamageStatement;
     }
@@ -309,6 +313,7 @@ namespace D4Companion.Crafting
             }
 
             string matchStatement = $"Matches {matches} of {targets.Count} build affixes for this slot.";
+            var completion = Completion(comparisons, targets.Count);
 
             if (needsCorrection)
             {
@@ -331,12 +336,15 @@ namespace D4Companion.Crafting
                     Comparisons = comparisons,
                     TargetCount = targets.Count,
                     MatchCount = matches,
-                    BuildMatchStatement = $"Matches all {targets.Count} build affixes for this slot.",
+                    BuildMatchStatement = $"{AllTargets(targets.Count)} matched.",
+                    AffixesStatement = completion.Affixes,
+                    ValuesStatement = completion.Values,
+                    GreaterStatement = completion.Greater,
                     Recommendation = new CraftingRecommendation
                     {
                         Kind = RecommendationKind.KeepItem,
                         Headline = "Keep this item",
-                        Summary = "It has every affix your build wants for this slot. No need to spend more materials on it.",
+                        Summary = $"{AllTargets(targets.Count)} matched. No crafting step is needed for your build.",
                         Keep = comparisons.Where(c => c.Status == AffixStatus.Match).Select(c => c.Name).ToList()
                     }
                 };
@@ -349,7 +357,10 @@ namespace D4Companion.Crafting
                 TargetCount = targets.Count,
                 MatchCount = matches,
                 BuildMatchStatement = matchStatement,
-                Recommendation = BuildNextStep(comparisons, options)
+                AffixesStatement = completion.Affixes,
+                ValuesStatement = completion.Values,
+                GreaterStatement = completion.Greater,
+                Recommendation = BuildNextStep(comparisons, options, snapshot)
             };
         }
 
@@ -430,8 +441,11 @@ namespace D4Companion.Crafting
             Summary = "Some lines are unknown or duplicated. Fix them so the comparison can be trusted."
         };
 
-        private static CraftingRecommendation BuildNextStep(IReadOnlyList<AffixComparison> comparisons, AdvisorOptions options)
+        private static CraftingRecommendation BuildNextStep(IReadOnlyList<AffixComparison> comparisons, AdvisorOptions options, GearSnapshot snapshot)
         {
+            var state = snapshot.CraftState ?? new ItemCraftState();
+            string slot = SlotWord(snapshot.ItemType);
+
             var keep = comparisons
                 .Where(c => c.Scanned != null && (c.Status == AffixStatus.Match || c.Scanned.IsKeep))
                 .Select(c => c.Name)
@@ -464,24 +478,34 @@ namespace D4Companion.Crafting
             {
                 checks.Add($"This item is missing {missing.Count} build affixes. Work on one at a time and check the result after each step.");
             }
+            if (comparisons.Any(c => c.IsOffTarget && c.Scanned?.Kind == AffixKind.Tempered))
+            {
+                checks.Add("Tempered affixes are changed by tempering at the Blacksmith, not at the cube.");
+            }
 
-            // Pick the off-target affix to work on, and the missing stat to aim for.
             AffixComparison? goal = missingRegular.FirstOrDefault();
-            AffixComparison? candidate = goal == null ? null : BestCandidate(replaceable, goal.Target!);
+            AffixComparison? candidate = goal == null ? null : BestCandidate(replaceable, goal.Target!, state);
 
             CraftingInstruction? instruction = null;
-            RecommendationKind kind;
+            RecommendationKind kind = RecommendationKind.ReviewItem;
             string headline;
             string targetStat = string.Empty;
             string summary;
             string candidateNote = string.Empty;
             int regularCount = comparisons.Count(c => c.Scanned != null && !c.IsDuplicate && c.Scanned.Kind is AffixKind.Normal or AffixKind.Greater);
+            var firstImprove = improveRows.FirstOrDefault();
 
-            if (goal != null && candidate != null && RerollInstruction(candidate, goal, comparisons, options) is CraftingInstruction reroll)
+            if (state.CannotBeModified)
+            {
+                targetStat = (goal ?? missingTempered.FirstOrDefault() ?? firstImprove)?.Name ?? string.Empty;
+                headline = "This item can't be changed";
+                summary = "You marked this item as no longer modifiable, so no crafting step is suggested. Look for another base item.";
+            }
+            else if (goal != null && candidate != null && RerollInstruction(candidate, goal, comparisons, state, slot) is CraftingInstruction reroll)
             {
                 instruction = reroll;
                 kind = RecommendationKind.ReviewReroll;
-                headline = $"{instruction.Operation} {candidate.Name}";
+                headline = $"{reroll.Operation} {candidate.Name}";
                 targetStat = goal.Name;
                 summary = $"{candidate.Name} is not in your build. Aim for {goal.Name} instead.";
                 if (candidate.Scanned!.Kind == AffixKind.Greater)
@@ -492,6 +516,8 @@ namespace D4Companion.Crafting
             else if (goal != null && regularCount < StandardAffixSlots)
             {
                 string prism = goal.Target!.TuningPrisms.FirstOrDefault() ?? string.Empty;
+                var verified = new List<string> { $"Your scan shows {regularCount} regular affixes on this {slot}." };
+                if (prism.Length > 0) verified.Add($"{goal.Name} is in the {PrismNames.Name(prism)} group (game data).");
                 instruction = new CraftingInstruction
                 {
                     Station = "Horadric Cube",
@@ -502,25 +528,29 @@ namespace D4Companion.Crafting
                     Reason = prism.Length > 0
                         ? $"The item has {regularCount} regular affixes, so there may be room for one more. The {PrismNames.Name(prism)} narrows the new affix to the group that includes {goal.Name}."
                         : $"The item has {regularCount} regular affixes, so there may be room for one more without losing anything.",
-                    Caveat = "Check in-game that this item can take another affix. The new affix is not guaranteed to be the one you want."
+                    Caveat = "The new affix is not guaranteed to be " + goal.Name + ".",
+                    Checked = verified,
+                    ConfirmInGame = new[]
+                    {
+                        "The cube offers Add an Affix for this item.",
+                        $"{goal.Name} can roll on a {slot}.",
+                        "If the new affix isn't the one you want, rescan and follow the updated plan."
+                    }
                 };
                 kind = RecommendationKind.ReviewReroll;
                 headline = "Add an affix";
                 targetStat = goal.Name;
                 summary = $"The item is missing {goal.Name} and seems to have a free affix slot.";
             }
-            else if (goal != null && candidate != null && options.EnchantUsed)
-            {
-                kind = RecommendationKind.ReviewItem;
-                targetStat = goal.Name;
-                headline = "No safe step left";
-                summary = $"Changing {candidate.Name} into {goal.Name} would need the Occultist, but this item's enchant is already used. Decide in-game after the earlier steps.";
-            }
             else if (goal != null)
             {
-                kind = RecommendationKind.ReviewItem;
                 targetStat = goal.Name;
-                if (protectedGreater.Count > 0)
+                if (candidate != null)
+                {
+                    headline = "No safe step left";
+                    summary = $"Changing {candidate.Name} into {goal.Name} would need the Occultist, but this item's enchant is already used on another affix. Decide in-game.";
+                }
+                else if (protectedGreater.Count > 0)
                 {
                     headline = "Replacement candidates are protected";
                     summary = $"The item is missing {goal.Name}. The only affixes not in your build are greater, so they are protected.";
@@ -538,55 +568,77 @@ namespace D4Companion.Crafting
             else if (missingTempered.Count > 0)
             {
                 var tempered = missingTempered[0];
-                instruction = new CraftingInstruction
-                {
-                    Station = "Blacksmith",
-                    Operation = "Temper",
-                    DesiredAffix = tempered.Name,
-                    Goal = tempered.Target,
-                    Reason = $"Your build wants {tempered.Name} as a tempered affix. Tempering adds it without changing your other affixes.",
-                    Caveat = $"Check that you have a tempering recipe that can give {tempered.Name}, and that the item has tempers left."
-                };
-                kind = RecommendationKind.ReviewReroll;
-                headline = $"Temper for {tempered.Name}";
                 targetStat = tempered.Name;
-                summary = "All regular build affixes are present. Only a tempered one is missing.";
+                if (state.NoTempersLeft)
+                {
+                    headline = "No tempers left";
+                    summary = $"Your build wants {tempered.Name} as a tempered affix, but you marked this item as having no tempers left.";
+                }
+                else if (tempered.Target!.CanBeTempered == false)
+                {
+                    headline = "Not a tempering affix";
+                    summary = $"Your build lists {tempered.Name} as tempered, but the game data doesn't list it as a tempering affix. Check the build guide.";
+                }
+                else
+                {
+                    var verified = new List<string>();
+                    if (tempered.Target.CanBeTempered == true) verified.Add($"{tempered.Name} is a tempering affix (game data).");
+                    verified.Add("You haven't marked this item as out of tempers.");
+                    instruction = new CraftingInstruction
+                    {
+                        Station = "Blacksmith",
+                        Operation = "Temper",
+                        DesiredAffix = tempered.Name,
+                        Goal = tempered.Target,
+                        Reason = $"Your build wants {tempered.Name} as a tempered affix. Tempering adds it without changing your other affixes.",
+                        Caveat = $"A tempering recipe can give several results, so {tempered.Name} is not guaranteed.",
+                        Checked = verified,
+                        ConfirmInGame = new[]
+                        {
+                            $"You have a tempering recipe that can give {tempered.Name}.",
+                            "The item still has tempers left."
+                        }
+                    };
+                    kind = RecommendationKind.ReviewReroll;
+                    headline = $"Temper for {tempered.Name}";
+                    summary = "All regular build affixes are present. Only a tempered one is missing.";
+                }
             }
-            else if (improveRows.Count > 0)
+            else if (firstImprove != null)
             {
-                var first = improveRows[0];
                 kind = RecommendationKind.ImproveValues;
-                targetStat = first.Name;
-                if (first.Status == AffixStatus.BelowMinimum)
+                targetStat = firstImprove.Name;
+                if (firstImprove.Status == AffixStatus.GreaterNeeded)
+                {
+                    headline = $"Look for a greater {firstImprove.Name}";
+                    summary = $"Your build wants a greater {firstImprove.Name}. Crafting cannot make an existing affix greater, so this usually comes from a better drop.";
+                }
+                else if (state.FullyMasterworked)
+                {
+                    headline = $"{firstImprove.Name} is below your minimum";
+                    summary = "You marked this item as fully masterworked, so its values can't be raised further here.";
+                }
+                else
                 {
                     instruction = new CraftingInstruction
                     {
                         Station = "Blacksmith",
                         Operation = "Masterwork",
-                        DesiredAffix = first.Name,
-                        Goal = first.Target,
-                        Reason = $"{first.Name} is on the item but below your minimum. Masterworking raises affix values without replacing them.",
-                        Caveat = "Check in-game how far this item can still be masterworked."
+                        DesiredAffix = firstImprove.Name,
+                        Goal = firstImprove.Target,
+                        Reason = $"{firstImprove.Name} is on the item but below your minimum. Masterworking raises affix values without replacing them.",
+                        Caveat = "Masterworking may not raise this value enough to reach your minimum.",
+                        Checked = new[] { $"Your scan shows {firstImprove.Name} below the minimum your build sets." },
+                        ConfirmInGame = new[] { "The item has masterwork ranks left." }
                     };
-                    headline = $"Masterwork for {first.Name}";
+                    headline = $"Masterwork for {firstImprove.Name}";
                     summary = "All build affixes are present. Some values are below your minimum.";
-                }
-                else
-                {
-                    headline = $"Look for a greater {first.Name}";
-                    summary = $"Your build wants a greater {first.Name}. Crafting cannot make an existing affix greater, so this usually comes from a better drop.";
                 }
             }
             else
             {
-                kind = RecommendationKind.ReviewItem;
                 headline = "Review the item";
                 summary = "Some affixes need a closer look before you decide.";
-            }
-
-            if (comparisons.Any(c => c.IsOffTarget && c.Scanned?.Kind == AffixKind.Tempered))
-            {
-                checks.Add("Tempered affixes are changed by tempering at the Blacksmith, not at the cube.");
             }
 
             return new CraftingRecommendation
@@ -600,7 +652,7 @@ namespace D4Companion.Crafting
                 Protected = candidate?.Scanned?.Kind == AffixKind.Greater
                     ? Array.Empty<string>()
                     : protectedGreater.Select(c => c.Name).ToList(),
-                ReplaceCandidate = candidate?.Scanned,
+                ReplaceCandidate = instruction == null ? null : candidate?.Scanned,
                 ReplaceCandidateNote = candidateNote,
                 MissingTargets = missing.Select(c => c.Target is { IsTempered: true } ? $"{c.Name} (tempered)" : c.Name).ToList(),
                 ImproveTargets = improve,
@@ -612,29 +664,70 @@ namespace D4Companion.Crafting
         /// <summary>Standard gear carries up to this many regular affixes.</summary>
         public const int StandardAffixSlots = 4;
 
-        // Prefer a regular affix that shares a prism group with the goal, so a Focused Reroll can be used.
-        private static AffixComparison? BestCandidate(IReadOnlyList<AffixComparison> replaceable, TargetAffix goal)
+        private sealed record CompletionStatements(string Affixes, string Values, string Greater);
+
+        // Kept separate on purpose: having the right affixes is not the same as meeting every requirement.
+        private static CompletionStatements Completion(IReadOnlyList<AffixComparison> comparisons, int targetCount)
+        {
+            var targeted = comparisons.Where(c => c.Target != null).ToList();
+            int present = targeted.Count(c => c.Scanned != null);
+
+            var withMinimum = targeted.Where(c => c.Target!.MinimumValue is > 0).ToList();
+            int valuesMet = withMinimum.Count(c => c.Scanned != null && c.Status != AffixStatus.BelowMinimum
+                                                   && c.Scanned.Value is double v && v >= c.Target!.MinimumValue!.Value);
+            var withGreater = targeted.Where(c => c.Target!.RequireGreater).ToList();
+            int greaterMet = withGreater.Count(c => c.Scanned?.Kind == AffixKind.Greater);
+
+            string affixes = present == targetCount
+                ? (targetCount == 1 ? "The target affix is on the item." : $"All {targetCount} target affixes are on the item.")
+                : $"{present} of {targetCount} target affixes are on the item.";
+            string values = withMinimum.Count == 0
+                ? "Minimum values: none set in your build."
+                : valuesMet == withMinimum.Count
+                    ? $"Minimum values: all {withMinimum.Count} met."
+                    : $"Minimum values: {valuesMet} of {withMinimum.Count} met.";
+            string greater = withGreater.Count == 0
+                ? "Greater affixes: none required by your build."
+                : greaterMet == withGreater.Count
+                    ? $"Greater affixes: all {withGreater.Count} required are greater."
+                    : $"Greater affixes: {greaterMet} of {withGreater.Count} required are greater.";
+            return new CompletionStatements(affixes, values, greater);
+        }
+
+        /// <summary>"All 4 target affixes", or "The target affix" when there is only one.</summary>
+        public static string AllTargets(int count) => count == 1 ? "The target affix" : $"All {count} target affixes";
+
+        private static string SlotWord(string itemType) => string.IsNullOrWhiteSpace(itemType) ? "item" : itemType.Trim().ToLowerInvariant();
+
+        // The enchanted affix comes first: it is the only one the Occultist can still change.
+        // Then regular affixes before greater ones, and ones that share a prism group with the goal.
+        private static AffixComparison? BestCandidate(IReadOnlyList<AffixComparison> replaceable, TargetAffix goal, ItemCraftState state)
         {
             return replaceable
-                .OrderBy(c => c.Scanned!.Kind == AffixKind.Greater ? 1 : 0)
+                .OrderBy(c => state.HasEnchant && IsEnchanted(c.Scanned!, state) ? 0 : 1)
+                .ThenBy(c => c.Scanned!.Kind == AffixKind.Greater ? 1 : 0)
                 .ThenBy(c => SharedPrism(c.Scanned!, goal).Length > 0 ? 0 : 1)
                 .FirstOrDefault();
         }
 
+        private static bool IsEnchanted(ScannedAffix affix, ItemCraftState state) =>
+            string.Equals(affix.AffixId, state.EnchantedAffixId, StringComparison.OrdinalIgnoreCase);
+
         private static string SharedPrism(ScannedAffix affix, TargetAffix goal) =>
             goal.TuningPrisms.FirstOrDefault(p => affix.TuningPrisms.Contains(p, StringComparer.OrdinalIgnoreCase)) ?? string.Empty;
 
-        private static CraftingInstruction? RerollInstruction(AffixComparison candidate, AffixComparison goal, IReadOnlyList<AffixComparison> comparisons, AdvisorOptions options)
+        private static CraftingInstruction? RerollInstruction(AffixComparison candidate, AffixComparison goal, IReadOnlyList<AffixComparison> comparisons,
+            ItemCraftState state, string slot)
         {
             var scanned = candidate.Scanned!;
             var target = goal.Target!;
             string shared = SharedPrism(scanned, target);
-            string goalPrism = target.TuningPrisms.FirstOrDefault() ?? string.Empty;
+            bool enchantAllowed = !state.HasEnchant || IsEnchanted(scanned, state);
 
-            if (shared.Length > 0)
-            {
-                // Other affixes in the same prism group could be the ones that change.
-                var atRisk = comparisons
+            // Other affixes in the same prism group could be the ones that change.
+            var atRisk = shared.Length == 0
+                ? new List<string>()
+                : comparisons
                     .Where(c => c.Scanned != null && !ReferenceEquals(c, candidate) && !c.IsDuplicate
                                 && c.Scanned.Kind is AffixKind.Normal or AffixKind.Greater
                                 && c.Scanned.TuningPrisms.Contains(shared, StringComparer.OrdinalIgnoreCase))
@@ -642,49 +735,53 @@ namespace D4Companion.Crafting
                     .Distinct()
                     .ToList();
 
-                if (atRisk.Count == 0 || options.EnchantUsed)
-                {
-                    if (atRisk.Count > 0)
-                    {
-                        return new CraftingInstruction
-                        {
-                            Station = "Horadric Cube",
-                            Operation = "Focused Reroll",
-                            PrismId = shared,
-                            AffectedAffix = candidate.Name,
-                            DesiredAffix = goal.Name,
-                            Goal = target,
-                            Reason = $"This item's enchant is already planned for another affix, so the cube is the remaining option. {candidate.Name} and {goal.Name} share this prism group.",
-                            Caveat = $"Risky: the reroll could change {JoinNames(atRisk)} instead. Confirm in-game which affix will change before you spend."
-                        };
-                    }
+            string slotCheck = $"{goal.Name} can roll on a {slot}.";
 
-                    return new CraftingInstruction
-                    {
-                        Station = "Horadric Cube",
-                        Operation = "Focused Reroll",
-                        PrismId = shared,
-                        AffectedAffix = candidate.Name,
-                        DesiredAffix = goal.Name,
-                        Goal = target,
-                        Reason = $"{candidate.Name} and {goal.Name} are in the same prism group, and {candidate.Name} is the only affix on this item in that group. A Focused Reroll with this prism keeps the result in that group.",
-                        Caveat = "The result is not guaranteed to be " + goal.Name + ". Confirm in-game which affix the reroll will change."
-                    };
-                }
+            if (shared.Length > 0 && (atRisk.Count == 0 || !enchantAllowed))
+            {
+                var verified = new List<string>
+                {
+                    $"{goal.Name} is in the {PrismNames.Name(shared)} group (game data).",
+                    $"{candidate.Name} is in the same group (game data)."
+                };
+                if (atRisk.Count == 0) verified.Add($"No other affix on this {slot} is in that group (your scan).");
 
                 return new CraftingInstruction
                 {
-                    Station = "Occultist",
-                    Operation = "Enchant",
+                    Station = "Horadric Cube",
+                    Operation = "Focused Reroll",
+                    PrismId = shared,
                     AffectedAffix = candidate.Name,
                     DesiredAffix = goal.Name,
                     Goal = target,
-                    Reason = $"{candidate.Name} is not in your build. A cube reroll in this prism group could also hit {JoinNames(atRisk)}, so enchanting is safer: it changes only the affix you pick, and you can keep the original if the options are worse.",
-                    Caveat = "Only one affix per item can be enchanted. If another affix was already enchanted, use that one or choose another step."
+                    Reason = atRisk.Count == 0
+                        ? $"{candidate.Name} and {goal.Name} are in the same prism group, and {candidate.Name} is the only affix on this item in that group. A Focused Reroll with this prism keeps the result in that group."
+                        : $"This item's enchant is already used on another affix, so the cube is the remaining option. {candidate.Name} and {goal.Name} share this prism group.",
+                    Caveat = atRisk.Count == 0
+                        ? $"Sharing a group doesn't guarantee {goal.Name}. The reroll can land on any affix in the group."
+                        : $"Risky: the reroll could change {JoinNames(atRisk)} instead of {candidate.Name}.",
+                    Checked = verified,
+                    ConfirmInGame = new[]
+                    {
+                        "The cube offers Focused Reroll for this item.",
+                        $"The reroll will change {candidate.Name}, not another affix.",
+                        slotCheck
+                    }
                 };
             }
 
-            if (options.EnchantUsed) return null;
+            if (!enchantAllowed) return null;
+
+            var enchantChecked = new List<string>
+            {
+                state.HasEnchant
+                    ? $"{candidate.Name} is the affix you marked as enchanted, so the Occultist can still change it."
+                    : "You haven't marked an enchanted affix on this item."
+            };
+            if (shared.Length == 0 && target.TuningPrisms.Count > 0)
+            {
+                enchantChecked.Add($"{candidate.Name} is not in the {PrismNames.Name(target.TuningPrisms[0])} group, so a Focused Reroll can't aim for {goal.Name} (game data).");
+            }
 
             return new CraftingInstruction
             {
@@ -693,10 +790,17 @@ namespace D4Companion.Crafting
                 AffectedAffix = candidate.Name,
                 DesiredAffix = goal.Name,
                 Goal = target,
-                Reason = goalPrism.Length > 0
-                    ? $"{candidate.Name} is not in your build and is in a different prism group from {goal.Name}. Enchanting changes only the affix you pick, and you can keep the original if the options are worse."
+                Reason = atRisk.Count > 0
+                    ? $"{candidate.Name} is not in your build. A cube reroll in this prism group could also hit {JoinNames(atRisk)}, so enchanting is safer: it changes only the affix you pick, and you can keep the original if the options are worse."
                     : $"{candidate.Name} is not in your build. Enchanting changes only the affix you pick, and you can keep the original if the options are worse.",
-                Caveat = $"{goal.Name} may not be among the options. Only one affix per item can be enchanted."
+                Caveat = $"{goal.Name} may not be among the options. Only one affix per item can be enchanted.",
+                Checked = enchantChecked,
+                ConfirmInGame = new[]
+                {
+                    $"The Occultist lets you enchant {candidate.Name} on this item.",
+                    $"{goal.Name} is offered. If it isn't, keep the original.",
+                    slotCheck
+                }
             };
         }
 
