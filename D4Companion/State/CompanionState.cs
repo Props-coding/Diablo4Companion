@@ -80,7 +80,12 @@ namespace D4Companion.State
             WeakReferenceMessenger.Default.Register<AffixPresetRemovedMessage>(this, (r, m) => RefreshBuildTarget());
             WeakReferenceMessenger.Default.Register<SelectedAffixesChangedMessage>(this, (r, m) => RefreshBuildTarget());
             WeakReferenceMessenger.Default.Register<ApplicationLoadedMessage>(this, (r, m) => RefreshBuildTarget());
-            WeakReferenceMessenger.Default.Register<AffixLanguageChangedMessage>(this, (r, m) => OnUiThread(() => AffixCatalogChanged?.Invoke(this, EventArgs.Empty)));
+            WeakReferenceMessenger.Default.Register<AffixLanguageChangedMessage>(this, (r, m) => OnUiThread(() =>
+            {
+                _affixTexts = null;
+                AffixCatalogChanged?.Invoke(this, EventArgs.Empty);
+                RefreshBuildTarget();
+            }));
         }
 
         public event EventHandler? LiveScanChanged;
@@ -144,12 +149,15 @@ namespace D4Companion.State
         public string GetAffixName(string affixId)
         {
             if (string.IsNullOrWhiteSpace(affixId)) return string.Empty;
-            // Scanner and preset ids are the full IdName, which can join several ids with ';'.
-            var info = _affixManager.Affixes.FirstOrDefault(a => a.IdName.Equals(affixId, StringComparison.OrdinalIgnoreCase))
-                ?? _affixManager.GetAffixInfoByIdName(affixId);
             // Never show raw ids to the user; callers fall back to the scanned text.
-            return info == null ? string.Empty : CleanDescription(info.Description);
+            return FindAffixText(affixId)?.Name ?? string.Empty;
         }
+
+        /// <summary>
+        /// True when the affix value is a percentage, so values can be shown as "6.3%".
+        /// </summary>
+        public bool IsPercentAffix(string affixId) =>
+            !string.IsNullOrWhiteSpace(affixId) && (FindAffixText(affixId)?.IsPercent ?? false);
 
         public IReadOnlyList<string> GetPrisms(string affixId)
         {
@@ -159,12 +167,53 @@ namespace D4Companion.State
 
         public IReadOnlyList<(string Id, string Name)> GetAffixCatalog()
         {
-            return _affixManager.Affixes
-                .Where(a => !string.IsNullOrWhiteSpace(a.IdName))
-                .GroupBy(a => a.IdName)
-                .Select(g => (g.Key, CleanDescription(g.First().Description)))
-                .OrderBy(a => a.Item2, StringComparer.CurrentCultureIgnoreCase)
+            return AffixTexts.Values
+                .Select(a => (a.Id, a.Name))
+                .OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
+        }
+
+        private sealed record AffixTextInfo(string Id, string Name, bool IsPercent);
+
+        private Dictionary<string, AffixTextInfo>? _affixTexts;
+
+        /// <summary>
+        /// Readable affix names by full id. "+#% Maximum Life" and "+# Maximum Life" both read
+        /// "Maximum Life", so the percent one gets "(%)" when names would otherwise repeat.
+        /// </summary>
+        private Dictionary<string, AffixTextInfo> AffixTexts
+        {
+            get
+            {
+                if (_affixTexts != null) return _affixTexts;
+
+                var entries = _affixManager.Affixes
+                    .Where(a => !string.IsNullOrWhiteSpace(a.IdName))
+                    .GroupBy(a => a.IdName, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .Select(a => new AffixTextInfo(a.IdName, AffixText.ReadableName(a.Description), AffixText.IsPercent(a.Description)))
+                    .Where(a => a.Name.Length > 0)
+                    .ToList();
+
+                var repeated = entries.GroupBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase)
+                    .Where(g => g.Count() > 1)
+                    .Select(g => g.Key)
+                    .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+
+                _affixTexts = entries
+                    .Select(e => repeated.Contains(e.Name) && e.IsPercent ? e with { Name = e.Name + " (%)" } : e)
+                    .ToDictionary(e => e.Id, StringComparer.OrdinalIgnoreCase);
+                return _affixTexts;
+            }
+        }
+
+        private AffixTextInfo? FindAffixText(string affixId)
+        {
+            if (AffixTexts.TryGetValue(affixId, out var info)) return info;
+
+            // Older saved data may hold a single id from the joined list.
+            var affix = _affixManager.GetAffixInfoByIdName(affixId);
+            return affix != null && AffixTexts.TryGetValue(affix.IdName, out info) ? info : null;
         }
 
         public static string SlotName(string itemType) => itemType switch
@@ -300,6 +349,9 @@ namespace D4Companion.State
                             TuningPrisms = GetPrisms(a.Id)
                         };
                     })
+                    // An import can list the same affix twice for a slot. Count it once.
+                    .GroupBy(t => (Id: t.AffixId.ToLowerInvariant(), Type: t.ItemType.ToLowerInvariant(), t.IsImplicit, t.IsTempered))
+                    .Select(g => g.First() with { RequireGreater = g.Any(t => t.RequireGreater) })
                     .ToList();
 
                 return new BuildTarget { Name = preset.Name, Affixes = targets };
@@ -309,12 +361,6 @@ namespace D4Companion.State
                 _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name);
                 return new BuildTarget();
             }
-        }
-
-        private static string CleanDescription(string description)
-        {
-            if (string.IsNullOrWhiteSpace(description)) return string.Empty;
-            return description.Replace("\r", " ").Replace("\n", " ").Trim();
         }
 
         private static void OnUiThread(Action action)

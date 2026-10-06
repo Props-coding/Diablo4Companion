@@ -257,10 +257,103 @@
                 <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Danger}" />
                 <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Danger}" />
             </DataTrigger>
+            <!-- On the item but not in the build: neutral, not a warning. -->
+            <DataTrigger Binding="{Binding IsOffTarget}" Value="True">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Border}" />
+                <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.TextMuted}" />
+            </DataTrigger>
             <DataTrigger Binding="{Binding Status}" Value="{x:Null}">
                 <Setter Property="Visibility" Value="Collapsed" />
             </DataTrigger>
         </Style.Triggers>
+    </Style>
+
+    <!-- Small label, for example "Greater" or "Tempered". -->
+    <Style x:Key="Companion.Tag" TargetType="Border">
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="6,1" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.TextMuted}" />
+        <Setter Property="TextElement.FontSize" Value="11" />
+    </Style>
+
+    <Style x:Key="Companion.Tag.Gold" TargetType="Border" BasedOn="{StaticResource Companion.Tag}">
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource Companion.Brush.Gold}" />
+    </Style>
+
+    <!-- Tuning prism chip. DataContext: PrismChip (Name, Color). -->
+    <DataTemplate x:Key="Companion.PrismChipTemplate">
+        <Border CornerRadius="10" Padding="8,2,10,2" Margin="0,4,6,0" Background="{StaticResource Companion.Brush.SurfaceRaised}"
+                BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="{Binding Color}" />
+                <TextBlock Text="{Binding Name}" FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center"
+                           Foreground="{StaticResource Companion.Brush.TextMuted}" FontFamily="{StaticResource Companion.Font}" />
+            </StackPanel>
+        </Border>
+    </DataTemplate>
+
+    <ItemsPanelTemplate x:Key="Companion.WrapPanel">
+        <WrapPanel />
+    </ItemsPanelTemplate>
+
+    <!-- A bar that stays at the top of a page with the next action. -->
+    <Style x:Key="Companion.ActionBar" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="18,12" />
+    </Style>
+
+    <!-- Folded section: a quiet header with a chevron. -->
+    <Style x:Key="Companion.Expander" TargetType="Expander">
+        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Text}" />
+        <Setter Property="FontFamily" Value="{StaticResource Companion.Font}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <DockPanel>
+                        <ToggleButton DockPanel.Dock="Top" Cursor="Hand"
+                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="Transparent" Padding="0,8" BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,1,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ContentPresenter VerticalAlignment="Center" />
+                                            <TextBlock x:Name="Chevron" Grid.Column="1" Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                       VerticalAlignment="Center" Foreground="{StaticResource Companion.Brush.TextMuted}" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="Chevron" Property="Text" Value="&#xE70E;" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                            <ContentPresenter Content="{TemplateBinding Header}" TextElement.FontWeight="SemiBold"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </ToggleButton>
+                        <ContentPresenter x:Name="Body" Margin="0,2,0,10" Visibility="Collapsed" />
+                    </DockPanel>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="Body" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Inputs use the MahApps dark styles so they stay consistent with the original pages. -->

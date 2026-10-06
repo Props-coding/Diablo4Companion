@@ -59,7 +59,7 @@ namespace D4Companion.Crafting.Tests
             Assert.That(result.MatchesBuild, Is.True);
             Assert.That(result.Recommendation.Kind, Is.EqualTo(RecommendationKind.KeepItem));
             Assert.That(result.Recommendation.ReplaceCandidate, Is.Null);
-            Assert.That(result.Recommendation.Summary, Does.Contain("no need to spend"));
+            Assert.That(result.Recommendation.Summary, Does.Contain("no need to spend").IgnoreCase);
         }
 
         [Test]
@@ -175,6 +175,43 @@ namespace D4Companion.Crafting.Tests
             var item = Ring(Affix("CritChance"), Affix("DamageOverTime", keep: true), Affix("Thorns"));
 
             var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("AttackSpeed")));
+
+            Assert.That(result.Recommendation.ReplaceCandidate?.AffixId, Is.EqualTo("Thorns"));
+        }
+
+        [Test]
+        public void GreaterOffTargetAffix_IsProtectedByDefault()
+        {
+            var item = Ring(Affix("Willpower", AffixKind.Greater), Affix("CritChance"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("AttackSpeed")));
+
+            Assert.That(result.Recommendation.ReplaceCandidate, Is.Null);
+            Assert.That(result.Recommendation.Protected, Is.EqualTo(new[] { "Willpower" }));
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("No safe reroll"));
+            Assert.That(result.Recommendation.TargetStat, Is.EqualTo("AttackSpeed"));
+        }
+
+        [Test]
+        public void GreaterOffTargetAffix_SuggestedOnlyWhenPlayerOptsIn()
+        {
+            var item = Ring(Affix("Willpower", AffixKind.Greater), Affix("CritChance"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("AttackSpeed")),
+                new AdvisorOptions { IncludeGreaterAffixes = true });
+
+            Assert.That(result.Recommendation.ReplaceCandidate?.AffixId, Is.EqualTo("Willpower"));
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Reroll Willpower"));
+            Assert.That(result.Recommendation.ReplaceCandidateNote, Does.Contain("greater"));
+        }
+
+        [Test]
+        public void NormalOffTargetAffix_IsPreferredOverGreater()
+        {
+            var item = Ring(Affix("Willpower", AffixKind.Greater), Affix("Thorns"), Affix("CritChance"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("AttackSpeed")),
+                new AdvisorOptions { IncludeGreaterAffixes = true });
 
             Assert.That(result.Recommendation.ReplaceCandidate?.AffixId, Is.EqualTo("Thorns"));
         }

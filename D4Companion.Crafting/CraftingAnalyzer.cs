@@ -55,11 +55,28 @@ namespace D4Companion.Crafting
 
     public sealed record PrismHint(string AffixName, IReadOnlyList<string> Prisms);
 
+    /// <summary>
+    /// Choices the player makes about what the advisor may suggest.
+    /// </summary>
+    public sealed record AdvisorOptions
+    {
+        /// <summary>
+        /// Greater affixes are valuable, so they are never suggested for replacement unless the player opts in.
+        /// </summary>
+        public bool IncludeGreaterAffixes { get; init; }
+    }
+
     public sealed record CraftingRecommendation
     {
         public RecommendationKind Kind { get; init; }
+        /// <summary>One short action, for example "Reroll Willpower".</summary>
         public string Headline { get; init; } = string.Empty;
+        /// <summary>The build stat this step is aiming for, if any.</summary>
+        public string TargetStat { get; init; } = string.Empty;
+        /// <summary>One short sentence explaining the action.</summary>
         public string Summary { get; init; } = string.Empty;
+        /// <summary>Greater affixes that were left out of suggestions because they are protected.</summary>
+        public IReadOnlyList<string> Protected { get; init; } = Array.Empty<string>();
         public IReadOnlyList<string> Keep { get; init; } = Array.Empty<string>();
         public ScannedAffix? ReplaceCandidate { get; init; }
         public string ReplaceCandidateNote { get; init; } = string.Empty;
@@ -103,8 +120,10 @@ namespace D4Companion.Crafting
         public const string PrismDisclaimer =
             "A prism narrows the possible results to a category. It does not guarantee a specific affix.";
 
-        public static CraftingAnalysis Analyze(GearSnapshot snapshot, BuildTarget? build)
+        public static CraftingAnalysis Analyze(GearSnapshot snapshot, BuildTarget? build, AdvisorOptions? options = null)
         {
+            options ??= new AdvisorOptions();
+
             if (!snapshot.IsConfirmed)
             {
                 return new CraftingAnalysis
@@ -114,7 +133,7 @@ namespace D4Companion.Crafting
                     {
                         Kind = RecommendationKind.ConfirmFirst,
                         Headline = "Confirm the item first",
-                        Summary = "Check every slot, value and affix type against the in-game tooltip, then confirm. Recommendations appear after that."
+                        Summary = "Check the item against the game, then confirm it to get advice."
                     }
                 };
             }
@@ -265,7 +284,7 @@ namespace D4Companion.Crafting
                     {
                         Kind = RecommendationKind.KeepItem,
                         Headline = "Keep this item",
-                        Summary = "It meets your selected target. There is no need to spend more materials on it.",
+                        Summary = "It has every affix your build wants for this slot. No need to spend more materials on it.",
                         Keep = comparisons.Where(c => c.Status == AffixStatus.Match).Select(c => c.Name).ToList()
                     }
                 };
@@ -278,7 +297,7 @@ namespace D4Companion.Crafting
                 TargetCount = targets.Count,
                 MatchCount = matches,
                 BuildMatchStatement = matchStatement,
-                Recommendation = BuildNextStep(comparisons)
+                Recommendation = BuildNextStep(comparisons, options)
             };
         }
 
@@ -329,7 +348,7 @@ namespace D4Companion.Crafting
             Summary = "Some lines are unknown or duplicated. Fix them so the comparison can be trusted."
         };
 
-        private static CraftingRecommendation BuildNextStep(IReadOnlyList<AffixComparison> comparisons)
+        private static CraftingRecommendation BuildNextStep(IReadOnlyList<AffixComparison> comparisons, AdvisorOptions options)
         {
             var keep = comparisons
                 .Where(c => c.Scanned != null && (c.Status == AffixStatus.Match || c.Scanned.IsKeep))
@@ -344,8 +363,9 @@ namespace D4Companion.Crafting
                 .ToList();
 
             var offTarget = comparisons.Where(c => c.IsOffTarget && c.Scanned != null && !c.Scanned.IsKeep).ToList();
+            var protectedGreater = offTarget.Where(c => c.Scanned!.Kind == AffixKind.Greater).ToList();
             var candidate = offTarget.FirstOrDefault(c => c.Scanned!.Kind == AffixKind.Normal)
-                ?? offTarget.FirstOrDefault(c => c.Scanned!.Kind == AffixKind.Greater);
+                ?? (options.IncludeGreaterAffixes ? protectedGreater.FirstOrDefault() : null);
 
             var checks = new List<string>
             {
@@ -354,19 +374,22 @@ namespace D4Companion.Crafting
             };
 
             string candidateNote = string.Empty;
-            if (missing.Count == 0)
+            if (missing.Count > 0)
             {
-                candidateNote = string.Empty;
-            }
-            else if (candidate?.Scanned?.Kind == AffixKind.Greater)
-            {
-                candidateNote = "This off-target affix is greater. Replacing it may lose the greater bonus.";
-            }
-            else if (candidate == null)
-            {
-                candidateNote = offTarget.Count == 0 && comparisons.Any(c => c.IsOffTarget)
-                    ? "Every off-target affix is marked Keep, tempered or implicit, so no replacement is suggested."
-                    : "There is no off-target affix to replace. Changing a matching affix would lose a build stat.";
+                if (candidate?.Scanned?.Kind == AffixKind.Greater)
+                {
+                    candidateNote = "This is a greater affix. You chose to include greater affixes, but replacing it loses the greater bonus.";
+                }
+                else if (candidate == null && protectedGreater.Count > 0)
+                {
+                    candidateNote = "Your only off-target affixes are greater, so they are protected. Tick \"Include greater affixes\" if you still want to consider them.";
+                }
+                else if (candidate == null)
+                {
+                    candidateNote = offTarget.Count == 0 && comparisons.Any(c => c.IsOffTarget)
+                        ? "Every off-target affix is marked Keep, tempered or implicit, so no replacement is suggested."
+                        : "Every affix on this item is in your build. Replacing one would lose a build stat.";
+                }
             }
 
             if (comparisons.Any(c => c.IsOffTarget && c.Scanned?.Kind == AffixKind.Tempered))
@@ -390,34 +413,48 @@ namespace D4Companion.Crafting
 
             RecommendationKind kind;
             string headline;
+            string targetStat = string.Empty;
             string summary;
             if (missing.Count > 0 && candidate != null)
             {
                 kind = RecommendationKind.ReviewReroll;
-                headline = "Review a reroll";
-                summary = $"Keep the matching affixes and check whether {candidate.Name} can be replaced with {missing[0].Name}.";
+                headline = $"Reroll {candidate.Name}";
+                targetStat = missing[0].Name;
+                summary = $"{candidate.Name} is not in your build. Aim for {missing[0].Name} instead.";
             }
             else if (missing.Count == 0 && improve.Count > 0)
             {
                 kind = RecommendationKind.ImproveValues;
-                headline = "Review value upgrades";
+                headline = $"Improve {improve[0]}";
+                targetStat = improve[0];
                 summary = "All build affixes are present. Some are below your minimum or need to be greater.";
+            }
+            else if (missing.Count > 0)
+            {
+                kind = RecommendationKind.ReviewItem;
+                headline = "No safe reroll";
+                targetStat = missing[0].Name;
+                summary = protectedGreater.Count > 0
+                    ? $"The item is missing {missing[0].Name}, but the only affix to replace is a protected greater affix."
+                    : $"The item is missing {missing[0].Name}, and nothing can be replaced without losing a build stat.";
             }
             else
             {
                 kind = RecommendationKind.ReviewItem;
                 headline = "Review the item";
-                summary = missing.Count > 0
-                    ? $"The item is missing {missing[0].Name}, and no safe replacement was found."
-                    : "Some affixes need a closer look before you decide.";
+                summary = "Some affixes need a closer look before you decide.";
             }
 
             return new CraftingRecommendation
             {
                 Kind = kind,
                 Headline = headline,
+                TargetStat = targetStat,
                 Summary = summary,
                 Keep = keep,
+                Protected = candidate == null || candidate.Scanned?.Kind != AffixKind.Greater
+                    ? protectedGreater.Select(c => c.Name).ToList()
+                    : Array.Empty<string>(),
                 ReplaceCandidate = missing.Count > 0 ? candidate?.Scanned : null,
                 ReplaceCandidateNote = candidateNote,
                 MissingTargets = missing.Select(c => c.Name).ToList(),

@@ -13,6 +13,15 @@ namespace D4Companion.ViewModels.Entities
     }
 
     /// <summary>
+    /// A tuning prism shown as a small coloured chip.
+    /// </summary>
+    public sealed record PrismChip(string Name, string Color)
+    {
+        public static IReadOnlyList<PrismChip> From(IEnumerable<string> prismIds) =>
+            prismIds.Select(PrismNames.Get).Select(p => new PrismChip(p.Name, p.Color)).ToList();
+    }
+
+    /// <summary>
     /// One editable affix line of the item under review in the Crafting Advisor.
     /// </summary>
     public class ScannedAffixViewModel : ObservableObject
@@ -24,6 +33,8 @@ namespace D4Companion.ViewModels.Entities
 
         private readonly Func<string, string> _nameLookup;
         private readonly Func<string, IReadOnlyList<string>> _prismLookup;
+        private readonly Func<string, bool> _percentLookup;
+        private bool _isOffTarget;
         private string _affixId;
         private string _valueText;
         private AffixKind _kind;
@@ -34,8 +45,9 @@ namespace D4Companion.ViewModels.Entities
         private string _issue = string.Empty;
         private IReadOnlyList<AffixOption> _catalog;
 
-        public ScannedAffixViewModel(ScannedAffix model, IReadOnlyList<AffixOption> catalog, Func<string, string> nameLookup, Func<string, IReadOnlyList<string>> prismLookup)
+        public ScannedAffixViewModel(ScannedAffix model, IReadOnlyList<AffixOption> catalog, Func<string, string> nameLookup, Func<string, IReadOnlyList<string>> prismLookup, Func<string, bool> percentLookup)
         {
+            _percentLookup = percentLookup;
             _catalog = catalog;
             _nameLookup = nameLookup;
             _prismLookup = prismLookup;
@@ -86,6 +98,8 @@ namespace D4Companion.ViewModels.Entities
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(DisplayName));
                 OnPropertyChanged(nameof(SelectedAffix));
+                OnPropertyChanged(nameof(ValueDisplay));
+                OnPropertyChanged(nameof(Prisms));
                 OnPropertyChanged(nameof(PrismsText));
                 OnPropertyChanged(nameof(HasPrisms));
                 Edited?.Invoke(this, EventArgs.Empty);
@@ -126,6 +140,7 @@ namespace D4Companion.ViewModels.Entities
                 _valueText = value;
                 MarkCorrected();
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(ValueDisplay));
                 Edited?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -139,6 +154,9 @@ namespace D4Companion.ViewModels.Entities
                 _kind = value;
                 MarkCorrected();
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(KindTag));
+                OnPropertyChanged(nameof(HasKindTag));
+                OnPropertyChanged(nameof(IsGreater));
                 Edited?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -166,7 +184,46 @@ namespace D4Companion.ViewModels.Entities
             get
             {
                 var prisms = _prismLookup(_affixId);
-                return prisms.Count == 0 ? string.Empty : "Prisms: " + string.Join(", ", prisms);
+                return prisms.Count == 0 ? string.Empty : "Prisms: " + string.Join(", ", prisms.Select(PrismNames.Name));
+            }
+        }
+
+        public IReadOnlyList<PrismChip> Prisms => PrismChip.From(_prismLookup(_affixId));
+
+        /// <summary>
+        /// The value as the game shows it: "6.3%" or "1,813".
+        /// </summary>
+        public string ValueDisplay
+        {
+            get
+            {
+                if (!TryGetValue(out double? value) || value == null) return string.IsNullOrWhiteSpace(_valueText) ? string.Empty : _valueText;
+                return AffixText.FormatValue(value, _percentLookup(_affixId));
+            }
+        }
+
+        public bool IsGreater => _kind == AffixKind.Greater;
+
+        public string KindTag => _kind switch
+        {
+            AffixKind.Greater => "Greater",
+            AffixKind.Tempered => "Tempered",
+            AffixKind.Implicit => "Implicit",
+            AffixKind.Unknown => "Type unknown",
+            _ => string.Empty
+        };
+
+        public bool HasKindTag => KindTag.Length > 0;
+
+        /// <summary>
+        /// The affix is on the item but not in the build.
+        /// </summary>
+        public bool IsOffTarget
+        {
+            get => _isOffTarget;
+            set
+            {
+                if (SetProperty(ref _isOffTarget, value)) OnPropertyChanged(nameof(StatusText));
             }
         }
 
@@ -180,11 +237,16 @@ namespace D4Companion.ViewModels.Entities
             get => _status;
             set
             {
-                if (SetProperty(ref _status, value)) OnPropertyChanged(nameof(StatusText));
+                if (SetProperty(ref _status, value))
+                {
+                    OnPropertyChanged(nameof(StatusText));
+                    OnPropertyChanged(nameof(HasStatus));
+                }
             }
         }
 
-        public string StatusText => CraftingText.StatusLabel(_status);
+        public string StatusText => _isOffTarget && _status == AffixStatus.Review ? "Not in build" : CraftingText.StatusLabel(_status);
+        public bool HasStatus => _status != null;
 
         public string Explanation
         {

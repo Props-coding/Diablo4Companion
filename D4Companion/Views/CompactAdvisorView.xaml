@@ -10,6 +10,10 @@
     d:DataContext="{d:DesignInstance Type=viewModels:CraftingViewModel}"
     d:DesignHeight="800" d:DesignWidth="440">
 
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
     <!-- Compact second-monitor mode: the selected build, the captured item and the next step. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="12">
@@ -17,15 +21,23 @@
             <TextBlock Text="{Binding LiveScanText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,8,0,0" />
             <Button Content="{Binding ScannerButtonText}" Command="{Binding ToggleScannerCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="0,8,0,0" />
 
-            <Grid Margin="0,10,0,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Button Content="Capture scan" Command="{Binding CaptureScanCommand}" Style="{StaticResource Companion.Button.Primary}" />
-                <Button Grid.Column="2" Content="Confirm item" Command="{Binding ConfirmCommand}" Style="{StaticResource Companion.Button.Secondary}" />
-            </Grid>
+            <Border Style="{StaticResource Companion.ActionBar}" Padding="12,10" Margin="0,10,0,10">
+                <StackPanel>
+                    <TextBlock Text="{Binding NextActionTitle}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding NextActionDetail}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,2,0,8" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Content="Capture scan" Command="{Binding CaptureScanCommand}" Style="{StaticResource Companion.Button.Primary}" />
+                        <Button Grid.Column="2" Content="Confirm item" Command="{Binding ConfirmCommand}" Style="{StaticResource Companion.Button.Secondary}" />
+                    </Grid>
+                    <Button Content="Rescan after crafting" Command="{Binding RescanAfterCraftingCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="0,8,0,0"
+                            Visibility="{Binding ShowRescanAction, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Border>
 
             <Border Style="{StaticResource Companion.Card}" Padding="12" Margin="0,0,0,10">
                 <StackPanel>
@@ -39,7 +51,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Style="{StaticResource Companion.Text}" FontSize="13" Margin="0,0,8,0">
-                                        <Run Text="{Binding DisplayName, Mode=OneWay}" /> <Run Text="{Binding ValueText, Mode=OneWay}" Foreground="{StaticResource Companion.Brush.TextMuted}" />
+                                        <Run Text="{Binding DisplayName, Mode=OneWay}" /><Run Text=" · " Foreground="{StaticResource Companion.Brush.TextFaint}" /><Run Text="{Binding ValueDisplay, Mode=OneWay}" FontWeight="SemiBold" />
                                     </TextBlock>
                                     <Border Grid.Column="1" Style="{StaticResource Companion.StatusPill}">
                                         <TextBlock Text="{Binding StatusText}" FontSize="11" />

@@ -22,8 +22,15 @@ namespace D4Companion.ViewModels
         public string ItemValue { get; init; } = string.Empty;
         public string Requirement { get; init; } = string.Empty;
         public AffixStatus? Status { get; init; }
-        public string StatusText => CraftingText.StatusLabel(Status);
+        public bool IsOffTarget { get; init; }
+        public string StatusText => IsOffTarget && Status == AffixStatus.Review ? "Not in build" : CraftingText.StatusLabel(Status);
         public string Explanation { get; init; } = string.Empty;
+    }
+
+    public sealed class PrismHintRowViewModel
+    {
+        public string AffixName { get; init; } = string.Empty;
+        public IReadOnlyList<PrismChip> Prisms { get; init; } = Array.Empty<PrismChip>();
     }
 
     public sealed class HistoryRowViewModel
@@ -63,6 +70,8 @@ namespace D4Companion.ViewModels
         private string _statusMessage = string.Empty;
         private CraftingAnalysis? _analysis;
         private DateTime _capturedAtUtc = DateTime.UtcNow;
+        private bool _isEditing;
+        private bool _includeGreaterAffixes;
 
         public CraftingViewModel(ILogger<CraftingViewModel> logger, CompanionState state)
         {
@@ -87,9 +96,11 @@ namespace D4Companion.ViewModels
             ClearCommand = new RelayCommand(Clear, () => HasItem);
             OpenBuildsCommand = new RelayCommand(() => _state.Navigate(CompanionPage.Builds));
             OpenGearCommand = new RelayCommand(() => _state.Navigate(CompanionPage.Gear));
+            EditScanCommand = new RelayCommand(() => IsEditing = !IsEditing, () => HasItem);
 
             LoadAffixCatalog();
             RefreshPresets();
+            RefreshNextAction();
         }
 
         // Commands
@@ -104,6 +115,7 @@ namespace D4Companion.ViewModels
         public ICommand ClearCommand { get; }
         public ICommand OpenBuildsCommand { get; }
         public ICommand OpenGearCommand { get; }
+        public ICommand EditScanCommand { get; }
 
         // Build selection
 
@@ -170,8 +182,44 @@ namespace D4Companion.ViewModels
                 if (SetProperty(ref _hasItem, value))
                 {
                     OnPropertyChanged(nameof(ItemTitle));
+                    OnPropertyChanged(nameof(ItemName));
+                    OnPropertyChanged(nameof(ItemDetails));
                     RefreshCommands();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Show the dropdowns and inputs. Off by default: the item reads as clean rows.
+        /// </summary>
+        public bool IsEditing
+        {
+            get => _isEditing;
+            set
+            {
+                if (SetProperty(ref _isEditing, value))
+                {
+                    OnPropertyChanged(nameof(IsReading));
+                    OnPropertyChanged(nameof(EditButtonText));
+                }
+            }
+        }
+
+        public bool IsReading => !_isEditing;
+        public string EditButtonText => _isEditing ? "Done editing" : "Edit scan";
+
+        public string ItemName => HasItem ? CompanionState.SlotName(_itemType) : "No item yet";
+
+        public string ItemDetails
+        {
+            get
+            {
+                if (!HasItem) return "Capture a scan to start.";
+                var parts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(_itemPowerText)) parts.Add($"{_itemPowerText} Item Power");
+                if (!string.IsNullOrWhiteSpace(_rarity)) parts.Add(CultureInfo.CurrentCulture.TextInfo.ToTitleCase(_rarity.ToLowerInvariant()));
+                if (_isUnique) parts.Add("Unique");
+                return string.Join(" · ", parts);
             }
         }
 
@@ -186,6 +234,7 @@ namespace D4Companion.ViewModels
                 if (SetProperty(ref _itemType, value ?? string.Empty))
                 {
                     OnPropertyChanged(nameof(ItemTitle));
+                    OnPropertyChanged(nameof(ItemName));
                     OnEdited();
                 }
             }
@@ -196,7 +245,11 @@ namespace D4Companion.ViewModels
             get => _itemPowerText;
             set
             {
-                if (SetProperty(ref _itemPowerText, value ?? string.Empty)) OnEdited();
+                if (SetProperty(ref _itemPowerText, value ?? string.Empty))
+                {
+                    OnPropertyChanged(nameof(ItemDetails));
+                    OnEdited();
+                }
             }
         }
 
@@ -205,7 +258,11 @@ namespace D4Companion.ViewModels
             get => _rarity;
             set
             {
-                if (SetProperty(ref _rarity, value ?? string.Empty)) OnEdited();
+                if (SetProperty(ref _rarity, value ?? string.Empty))
+                {
+                    OnPropertyChanged(nameof(ItemDetails));
+                    OnEdited();
+                }
             }
         }
 
@@ -214,7 +271,11 @@ namespace D4Companion.ViewModels
             get => _isUnique;
             set
             {
-                if (SetProperty(ref _isUnique, value)) OnEdited();
+                if (SetProperty(ref _isUnique, value))
+                {
+                    OnPropertyChanged(nameof(ItemDetails));
+                    OnEdited();
+                }
             }
         }
 
@@ -226,13 +287,17 @@ namespace D4Companion.ViewModels
                 if (SetProperty(ref _isConfirmed, value))
                 {
                     OnPropertyChanged(nameof(ConfirmationText));
+                    OnPropertyChanged(nameof(ConfirmButtonText));
+                    RefreshNextAction();
                 }
             }
         }
 
         public string ConfirmationText => IsConfirmed
             ? "Confirmed. If you change anything you will need to confirm again."
-            : "Check every line against the in-game tooltip, correct mistakes, then confirm the item.";
+            : "Does this match the game? If something is wrong, use Edit scan to fix it.";
+
+        public string ConfirmButtonText => IsConfirmed ? "Confirmed" : "Looks right, confirm";
 
         public string StatusMessage
         {
@@ -243,7 +308,53 @@ namespace D4Companion.ViewModels
         public bool HasUnsavedChanges
         {
             get => _hasUnsavedChanges;
-            private set => SetProperty(ref _hasUnsavedChanges, value);
+            private set
+            {
+                if (SetProperty(ref _hasUnsavedChanges, value)) RefreshNextAction();
+            }
+        }
+
+        // Next action bar: always visible at the top of the page.
+
+        public string NextActionTitle { get; private set; } = string.Empty;
+        public string NextActionDetail { get; private set; } = string.Empty;
+        public bool ShowCaptureAction { get; private set; }
+        public bool ShowConfirmAction { get; private set; }
+        public bool ShowSaveAction { get; private set; }
+        public bool ShowRescanAction { get; private set; }
+
+        private void RefreshNextAction()
+        {
+            ShowCaptureAction = ShowConfirmAction = ShowSaveAction = ShowRescanAction = false;
+
+            if (!HasItem)
+            {
+                NextActionTitle = "Capture an item";
+                NextActionDetail = _state.LiveScan != null
+                    ? "The scanner has read an item. Capture it to start."
+                    : _state.IsScannerOn ? "Hover over a piece of gear in Diablo IV." : "Turn the scanner on, then hover over a piece of gear in Diablo IV.";
+                ShowCaptureAction = true;
+            }
+            else if (!IsConfirmed)
+            {
+                NextActionTitle = "Check the item, then confirm";
+                NextActionDetail = "Compare it with the game. Use Edit scan if anything is wrong.";
+                ShowConfirmAction = true;
+            }
+            else
+            {
+                NextActionTitle = Headline;
+                NextActionDetail = HasTargetStat ? $"Target: {TargetStat}" : Summary;
+                ShowSaveAction = HasUnsavedChanges;
+                ShowRescanAction = !HasUnsavedChanges && _currentRecordId != null;
+            }
+
+            OnPropertyChanged(nameof(NextActionTitle));
+            OnPropertyChanged(nameof(NextActionDetail));
+            OnPropertyChanged(nameof(ShowCaptureAction));
+            OnPropertyChanged(nameof(ShowConfirmAction));
+            OnPropertyChanged(nameof(ShowSaveAction));
+            OnPropertyChanged(nameof(ShowRescanAction));
         }
 
         // Recommendation
@@ -255,6 +366,24 @@ namespace D4Companion.ViewModels
         public string Headline => _analysis?.Recommendation.Headline ?? "Confirm the item first";
         public string Summary => _analysis?.Recommendation.Summary
             ?? "Capture a scan, check the values, and confirm. The advisor only gives a recommendation for a confirmed item.";
+        public string TargetStat => _analysis?.Recommendation.TargetStat ?? string.Empty;
+        public bool HasTargetStat => ShowRecommendation && !string.IsNullOrEmpty(TargetStat);
+        public string ProtectedText => Join(_analysis?.Recommendation.Protected);
+        public bool HasProtected => !string.IsNullOrEmpty(ProtectedText);
+
+        /// <summary>
+        /// Greater affixes are protected by default. The player can choose to include them in suggestions.
+        /// </summary>
+        public bool IncludeGreaterAffixes
+        {
+            get => _includeGreaterAffixes;
+            set
+            {
+                if (SetProperty(ref _includeGreaterAffixes, value)) Analyze();
+            }
+        }
+
+        public bool HasDetails => HasKeep || HasReplace || HasTarget || HasImprove || HasProtected;
         public string KeepText => Join(_analysis?.Recommendation.Keep);
         public bool HasKeep => !string.IsNullOrEmpty(KeepText);
         public string ReplaceText => _analysis?.Recommendation.ReplaceCandidate is ScannedAffix candidate ? NameOf(candidate) : string.Empty;
@@ -265,7 +394,7 @@ namespace D4Companion.ViewModels
         public bool HasTarget => !string.IsNullOrEmpty(TargetText);
         public string ImproveText => Join(_analysis?.Recommendation.ImproveTargets);
         public bool HasImprove => !string.IsNullOrEmpty(ImproveText);
-        public ObservableCollection<string> PrismHints { get; } = new();
+        public ObservableCollection<PrismHintRowViewModel> PrismHints { get; } = new();
         public bool HasPrismHints => PrismHints.Count > 0;
         public ObservableCollection<string> InGameChecks { get; } = new();
         public bool HasInGameChecks => InGameChecks.Count > 0;
@@ -418,6 +547,7 @@ namespace D4Companion.ViewModels
             _rarity = string.Empty;
             _isUnique = false;
             HasItem = false;
+            IsEditing = false;
             IsConfirmed = false;
             HasUnsavedChanges = false;
             StatusMessage = string.Empty;
@@ -467,6 +597,8 @@ namespace D4Companion.ViewModels
             OnPropertyChanged(nameof(Rarity));
             OnPropertyChanged(nameof(IsUnique));
             OnPropertyChanged(nameof(ItemTitle));
+            OnPropertyChanged(nameof(ItemName));
+            OnPropertyChanged(nameof(ItemDetails));
             OnPropertyChanged(nameof(HasValidationIssues));
             OnPropertyChanged(nameof(CanRescanAfterCrafting));
             RefreshCommands();
@@ -475,7 +607,7 @@ namespace D4Companion.ViewModels
 
         private ScannedAffixViewModel CreateRow(ScannedAffix affix)
         {
-            var row = new ScannedAffixViewModel(affix, _affixCatalog, LookupName, id => _state.GetPrisms(id));
+            var row = new ScannedAffixViewModel(affix, _affixCatalog, LookupName, id => _state.GetPrisms(id), id => _state.IsPercentAffix(id));
             row.Edited += Row_Edited;
             return row;
         }
@@ -554,6 +686,7 @@ namespace D4Companion.ViewModels
             foreach (var row in Affixes)
             {
                 row.Status = null;
+                row.IsOffTarget = false;
                 row.Explanation = string.Empty;
             }
 
@@ -562,7 +695,8 @@ namespace D4Companion.ViewModels
                 try
                 {
                     var snapshot = BuildSnapshot(out _) with { IsConfirmed = true };
-                    _analysis = CraftingAnalyzer.Analyze(snapshot, _state.BuildTarget);
+                    _analysis = CraftingAnalyzer.Analyze(snapshot, _state.BuildTarget,
+                        new AdvisorOptions { IncludeGreaterAffixes = _includeGreaterAffixes });
 
                     foreach (var comparison in _analysis.Comparisons)
                     {
@@ -570,6 +704,7 @@ namespace D4Companion.ViewModels
                         {
                             Name = comparison.Name,
                             ItemValue = comparison.Scanned == null ? "Not on item" : FormatValue(comparison.Scanned),
+                            IsOffTarget = comparison.IsOffTarget,
                             Requirement = comparison.Target == null ? "Not in build" : Requirement(comparison.Target),
                             Status = comparison.Status,
                             Explanation = comparison.Explanation
@@ -578,13 +713,14 @@ namespace D4Companion.ViewModels
                         if (comparison.ScannedIndex is int index && index < Affixes.Count)
                         {
                             Affixes[index].Status = comparison.Status;
+                            Affixes[index].IsOffTarget = comparison.IsOffTarget;
                             Affixes[index].Explanation = comparison.Explanation;
                         }
                     }
 
                     foreach (var hint in _analysis.Recommendation.PrismHints)
                     {
-                        PrismHints.Add($"{hint.AffixName}: {string.Join(", ", hint.Prisms)}");
+                        PrismHints.Add(new PrismHintRowViewModel { AffixName = hint.AffixName, Prisms = PrismChip.From(hint.Prisms) });
                     }
                     foreach (var check in _analysis.Recommendation.InGameChecks)
                     {
@@ -617,6 +753,12 @@ namespace D4Companion.ViewModels
             OnPropertyChanged(nameof(HasPrismHints));
             OnPropertyChanged(nameof(HasInGameChecks));
             OnPropertyChanged(nameof(BuildMatchStatement));
+            OnPropertyChanged(nameof(TargetStat));
+            OnPropertyChanged(nameof(HasTargetStat));
+            OnPropertyChanged(nameof(ProtectedText));
+            OnPropertyChanged(nameof(HasProtected));
+            OnPropertyChanged(nameof(HasDetails));
+            RefreshNextAction();
         }
 
         private void RefreshHistory()
@@ -676,6 +818,7 @@ namespace D4Companion.ViewModels
             OnPropertyChanged(nameof(IsScannerOn));
             OnPropertyChanged(nameof(ScannerButtonText));
             RefreshCommands();
+            RefreshNextAction();
         }
 
         private void OnBuildTargetChanged()
@@ -714,7 +857,7 @@ namespace D4Companion.ViewModels
 
         private void RefreshCommands()
         {
-            foreach (var command in new[] { CaptureScanCommand, RescanAfterCraftingCommand, ConfirmCommand, SaveCommand, AddAffixCommand, ClearCommand })
+            foreach (var command in new[] { CaptureScanCommand, RescanAfterCraftingCommand, ConfirmCommand, SaveCommand, AddAffixCommand, ClearCommand, EditScanCommand })
             {
                 (command as IRelayCommand)?.NotifyCanExecuteChanged();
             }
@@ -723,19 +866,19 @@ namespace D4Companion.ViewModels
         private string NameOf(ScannedAffix affix) =>
             !string.IsNullOrWhiteSpace(affix.DisplayName) ? affix.DisplayName : LookupName(affix.AffixId);
 
-        private static string FormatValue(ScannedAffix affix)
+        private string FormatValue(ScannedAffix affix)
         {
-            string value = affix.Value.HasValue ? affix.Value.Value.ToString("0.##", CultureInfo.CurrentCulture) : "no value";
+            string value = affix.Value.HasValue ? AffixText.FormatValue(affix.Value, _state.IsPercentAffix(affix.AffixId)) : "no value";
             return affix.Kind is AffixKind.Normal or AffixKind.Unknown ? value : $"{value} ({affix.Kind.ToString().ToLowerInvariant()})";
         }
 
-        private static string Requirement(TargetAffix target)
+        private string Requirement(TargetAffix target)
         {
             var parts = new List<string>();
             if (target.RequireGreater) parts.Add("greater");
             if (target.IsTempered) parts.Add("tempered");
             if (target.IsImplicit) parts.Add("implicit");
-            if (target.MinimumValue is double minimum) parts.Add($"at least {minimum.ToString("0.##", CultureInfo.CurrentCulture)}");
+            if (target.MinimumValue is double minimum) parts.Add($"at least {AffixText.FormatValue(minimum, _state.IsPercentAffix(target.AffixId))}");
             return parts.Count == 0 ? "In build" : "In build, " + string.Join(", ", parts);
         }
 

@@ -37,7 +37,7 @@ namespace D4Companion.Views
 
             // Create the original pages up front, in the same order as before, so their
             // view models start listening for hotkeys and overlay messages at launch.
-            _pages[CompanionPage.Builds] = new AffixView();
+            _pages[CompanionPage.Builds] = new BuildsView();
             _pages[CompanionPage.Trading] = new TradeView();
             _pages[CompanionPage.Logging] = new LoggingView();
             _pages[CompanionPage.Debug] = new DebugView();
