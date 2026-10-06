@@ -78,6 +78,44 @@
 
             <StackPanel Visibility="{Binding ShowRecommendation, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
 
+                <!-- Every step for this item, each assuming the one before it worked. -->
+                <Expander Style="{StaticResource Companion.Expander}" IsExpanded="True" Header="{Binding PlanHeader}"
+                          Visibility="{Binding HasPlan, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding PlanSteps}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="22" Height="22" CornerRadius="11" Margin="0,0,10,0" VerticalAlignment="Top" BorderThickness="1"
+                                                Background="{StaticResource Companion.Brush.GoldSoft}" BorderBrush="{StaticResource Companion.Brush.Gold}">
+                                            <TextBlock Text="{Binding Number}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Gold}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Operation}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
+                                            <ItemsControl ItemsSource="{Binding Prism}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
+                                                          ItemsPanel="{StaticResource Companion.WrapPanel}"
+                                                          Visibility="{Binding HasPrism, Converter={StaticResource BoolToVisibility}}" />
+                                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Companion.Text.Muted}" />
+                                            <TextBlock Style="{StaticResource Companion.Text.Muted}" Visibility="{Binding HasAimFor, Converter={StaticResource BoolToVisibility}}">
+                                                <Run Text="Aim for " /><Run Text="{Binding AimFor, Mode=OneWay}" Foreground="{StaticResource Companion.Brush.Gold}" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding IfItWorks}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding PlanEndNote}" Style="{StaticResource Companion.Text}" FontSize="13"
+                                   Visibility="{Binding HasPlanEndNote, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Text="{Binding PlanDisclaimer, Mode=OneWay}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,8,0,0" />
+                    </StackPanel>
+                </Expander>
+
                 <Expander Style="{StaticResource Companion.Expander}" Header="Details" Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel>
                         <StackPanel Margin="0,0,0,10" Visibility="{Binding HasKeep, Converter={StaticResource BoolToVisibility}}">

@@ -66,6 +66,12 @@ namespace D4Companion.Crafting
         /// Greater affixes are valuable, so they are never suggested for replacement unless the player opts in.
         /// </summary>
         public bool IncludeGreaterAffixes { get; init; }
+
+        /// <summary>
+        /// The item already has an enchanted affix, so the Occultist can only change that one.
+        /// Set by the planner after it suggests an enchant.
+        /// </summary>
+        public bool EnchantUsed { get; init; }
     }
 
     /// <summary>
@@ -88,6 +94,8 @@ namespace D4Companion.Crafting
         public string Reason { get; init; } = string.Empty;
         /// <summary>What to confirm in the game before spending anything.</summary>
         public string Caveat { get; init; } = string.Empty;
+        /// <summary>The build line this step works towards. Used by the planner.</summary>
+        public TargetAffix? Goal { get; init; }
 
         public string PrismName => PrismId.Length == 0 ? string.Empty : PrismNames.Name(PrismId);
 
@@ -469,9 +477,9 @@ namespace D4Companion.Crafting
             string candidateNote = string.Empty;
             int regularCount = comparisons.Count(c => c.Scanned != null && !c.IsDuplicate && c.Scanned.Kind is AffixKind.Normal or AffixKind.Greater);
 
-            if (goal != null && candidate != null)
+            if (goal != null && candidate != null && RerollInstruction(candidate, goal, comparisons, options) is CraftingInstruction reroll)
             {
-                instruction = RerollInstruction(candidate, goal, comparisons);
+                instruction = reroll;
                 kind = RecommendationKind.ReviewReroll;
                 headline = $"{instruction.Operation} {candidate.Name}";
                 targetStat = goal.Name;
@@ -490,6 +498,7 @@ namespace D4Companion.Crafting
                     Operation = "Add an Affix",
                     PrismId = prism,
                     DesiredAffix = goal.Name,
+                    Goal = goal.Target,
                     Reason = prism.Length > 0
                         ? $"The item has {regularCount} regular affixes, so there may be room for one more. The {PrismNames.Name(prism)} narrows the new affix to the group that includes {goal.Name}."
                         : $"The item has {regularCount} regular affixes, so there may be room for one more without losing anything.",
@@ -499,6 +508,13 @@ namespace D4Companion.Crafting
                 headline = "Add an affix";
                 targetStat = goal.Name;
                 summary = $"The item is missing {goal.Name} and seems to have a free affix slot.";
+            }
+            else if (goal != null && candidate != null && options.EnchantUsed)
+            {
+                kind = RecommendationKind.ReviewItem;
+                targetStat = goal.Name;
+                headline = "No safe step left";
+                summary = $"Changing {candidate.Name} into {goal.Name} would need the Occultist, but this item's enchant is already used. Decide in-game after the earlier steps.";
             }
             else if (goal != null)
             {
@@ -527,6 +543,7 @@ namespace D4Companion.Crafting
                     Station = "Blacksmith",
                     Operation = "Temper",
                     DesiredAffix = tempered.Name,
+                    Goal = tempered.Target,
                     Reason = $"Your build wants {tempered.Name} as a tempered affix. Tempering adds it without changing your other affixes.",
                     Caveat = $"Check that you have a tempering recipe that can give {tempered.Name}, and that the item has tempers left."
                 };
@@ -547,6 +564,7 @@ namespace D4Companion.Crafting
                         Station = "Blacksmith",
                         Operation = "Masterwork",
                         DesiredAffix = first.Name,
+                        Goal = first.Target,
                         Reason = $"{first.Name} is on the item but below your minimum. Masterworking raises affix values without replacing them.",
                         Caveat = "Check in-game how far this item can still be masterworked."
                     };
@@ -606,7 +624,7 @@ namespace D4Companion.Crafting
         private static string SharedPrism(ScannedAffix affix, TargetAffix goal) =>
             goal.TuningPrisms.FirstOrDefault(p => affix.TuningPrisms.Contains(p, StringComparer.OrdinalIgnoreCase)) ?? string.Empty;
 
-        private static CraftingInstruction RerollInstruction(AffixComparison candidate, AffixComparison goal, IReadOnlyList<AffixComparison> comparisons)
+        private static CraftingInstruction? RerollInstruction(AffixComparison candidate, AffixComparison goal, IReadOnlyList<AffixComparison> comparisons, AdvisorOptions options)
         {
             var scanned = candidate.Scanned!;
             var target = goal.Target!;
@@ -624,8 +642,23 @@ namespace D4Companion.Crafting
                     .Distinct()
                     .ToList();
 
-                if (atRisk.Count == 0)
+                if (atRisk.Count == 0 || options.EnchantUsed)
                 {
+                    if (atRisk.Count > 0)
+                    {
+                        return new CraftingInstruction
+                        {
+                            Station = "Horadric Cube",
+                            Operation = "Focused Reroll",
+                            PrismId = shared,
+                            AffectedAffix = candidate.Name,
+                            DesiredAffix = goal.Name,
+                            Goal = target,
+                            Reason = $"This item's enchant is already planned for another affix, so the cube is the remaining option. {candidate.Name} and {goal.Name} share this prism group.",
+                            Caveat = $"Risky: the reroll could change {JoinNames(atRisk)} instead. Confirm in-game which affix will change before you spend."
+                        };
+                    }
+
                     return new CraftingInstruction
                     {
                         Station = "Horadric Cube",
@@ -633,6 +666,7 @@ namespace D4Companion.Crafting
                         PrismId = shared,
                         AffectedAffix = candidate.Name,
                         DesiredAffix = goal.Name,
+                        Goal = target,
                         Reason = $"{candidate.Name} and {goal.Name} are in the same prism group, and {candidate.Name} is the only affix on this item in that group. A Focused Reroll with this prism keeps the result in that group.",
                         Caveat = "The result is not guaranteed to be " + goal.Name + ". Confirm in-game which affix the reroll will change."
                     };
@@ -644,10 +678,13 @@ namespace D4Companion.Crafting
                     Operation = "Enchant",
                     AffectedAffix = candidate.Name,
                     DesiredAffix = goal.Name,
+                    Goal = target,
                     Reason = $"{candidate.Name} is not in your build. A cube reroll in this prism group could also hit {JoinNames(atRisk)}, so enchanting is safer: it changes only the affix you pick, and you can keep the original if the options are worse.",
                     Caveat = "Only one affix per item can be enchanted. If another affix was already enchanted, use that one or choose another step."
                 };
             }
+
+            if (options.EnchantUsed) return null;
 
             return new CraftingInstruction
             {
@@ -655,6 +692,7 @@ namespace D4Companion.Crafting
                 Operation = "Enchant",
                 AffectedAffix = candidate.Name,
                 DesiredAffix = goal.Name,
+                Goal = target,
                 Reason = goalPrism.Length > 0
                     ? $"{candidate.Name} is not in your build and is in a different prism group from {goal.Name}. Enchanting changes only the affix you pick, and you can keep the original if the options are worse."
                     : $"{candidate.Name} is not in your build. Enchanting changes only the affix you pick, and you can keep the original if the options are worse.",

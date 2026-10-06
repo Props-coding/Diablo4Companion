@@ -33,6 +33,19 @@ namespace D4Companion.ViewModels
         public IReadOnlyList<PrismChip> Prisms { get; init; } = Array.Empty<PrismChip>();
     }
 
+    public sealed class PlanStepRowViewModel
+    {
+        public int Number { get; init; }
+        public string Operation { get; init; } = string.Empty;
+        public string Detail { get; init; } = string.Empty;
+        public string AimFor { get; init; } = string.Empty;
+        public bool HasAimFor => AimFor.Length > 0;
+        public IReadOnlyList<PrismChip> Prism { get; init; } = Array.Empty<PrismChip>();
+        public bool HasPrism => Prism.Count > 0;
+        public string IfItWorks { get; init; } = string.Empty;
+        public bool IsFirst => Number == 1;
+    }
+
     public sealed class HistoryRowViewModel
     {
         public string Label { get; init; } = string.Empty;
@@ -418,6 +431,14 @@ namespace D4Companion.ViewModels
         public ObservableCollection<PrismHintRowViewModel> PrismHints { get; } = new();
         public bool HasPrismHints => PrismHints.Count > 0;
         public ObservableCollection<string> InGameChecks { get; } = new();
+
+        /// <summary>The full plan for this item: every step, each assuming the one before it worked.</summary>
+        public ObservableCollection<PlanStepRowViewModel> PlanSteps { get; } = new();
+        public bool HasPlan => ShowRecommendation && PlanSteps.Count > 0;
+        public string PlanHeader => PlanSteps.Count == 1 ? "Full plan · 1 step" : $"Full plan · {PlanSteps.Count} steps";
+        public string PlanEndNote { get; private set; } = string.Empty;
+        public bool HasPlanEndNote => HasPlan && PlanEndNote.Length > 0;
+        public string PlanDisclaimer => CraftingPlanner.PlanDisclaimer;
         public bool HasInGameChecks => InGameChecks.Count > 0;
         public string BuildMatchStatement => _analysis?.BuildMatchStatement ?? string.Empty;
         public string ItemQualityStatement => CraftingAnalyzer.ItemQualityStatement;
@@ -705,6 +726,8 @@ namespace D4Companion.ViewModels
             Comparisons.Clear();
             PrismHints.Clear();
             InGameChecks.Clear();
+            PlanSteps.Clear();
+            PlanEndNote = string.Empty;
             foreach (var row in Affixes)
             {
                 row.Status = null;
@@ -718,8 +741,24 @@ namespace D4Companion.ViewModels
                 try
                 {
                     var snapshot = BuildSnapshot(out _) with { IsConfirmed = true };
-                    _analysis = CraftingAnalyzer.Analyze(snapshot, _state.BuildTarget,
-                        new AdvisorOptions { IncludeGreaterAffixes = _includeGreaterAffixes });
+                    var options = new AdvisorOptions { IncludeGreaterAffixes = _includeGreaterAffixes };
+                    _analysis = CraftingAnalyzer.Analyze(snapshot, _state.BuildTarget, options);
+
+                    var plan = CraftingPlanner.Plan(snapshot, _state.BuildTarget, options);
+                    foreach (var step in plan.Steps)
+                    {
+                        var i = step.Instruction;
+                        PlanSteps.Add(new PlanStepRowViewModel
+                        {
+                            Number = step.Number,
+                            Operation = $"{i.Operation} at the {i.Station}",
+                            Detail = i.AffectedAffix.Length > 0 ? $"Change {i.AffectedAffix}" : string.Empty,
+                            AimFor = i.DesiredAffix,
+                            Prism = i.PrismId.Length > 0 ? PrismChip.From(new[] { i.PrismId }) : Array.Empty<PrismChip>(),
+                            IfItWorks = "If it works: " + step.IfItWorks
+                        });
+                    }
+                    PlanEndNote = plan.EndNote;
 
                     foreach (var comparison in _analysis.Comparisons)
                     {
@@ -782,7 +821,8 @@ namespace D4Companion.ViewModels
             OnPropertyChanged(nameof(ProtectedText));
             OnPropertyChanged(nameof(HasProtected));
             OnPropertyChanged(nameof(HasDetails));
-            foreach (var name in new[] { nameof(HasInstruction), nameof(ShowTargetTag), nameof(InstructionStation), nameof(InstructionOperation),
+            foreach (var name in new[] { nameof(HasPlan), nameof(PlanHeader), nameof(PlanEndNote), nameof(HasPlanEndNote),
+                         nameof(HasInstruction), nameof(ShowTargetTag), nameof(InstructionStation), nameof(InstructionOperation),
                          nameof(InstructionAffected), nameof(HasInstructionAffected), nameof(InstructionDesired), nameof(HasInstructionDesired),
                          nameof(InstructionPrism), nameof(HasInstructionPrism), nameof(InstructionReason),
                          nameof(InstructionCaveat), nameof(HasInstructionCaveat) })
