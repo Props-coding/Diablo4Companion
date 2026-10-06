@@ -67,7 +67,10 @@ namespace D4Companion.ViewModels.Entities
         public IReadOnlyList<AffixOption> Catalog
         {
             get => _catalog;
-            set => SetProperty(ref _catalog, value);
+            set
+            {
+                if (SetProperty(ref _catalog, value)) OnPropertyChanged(nameof(SelectedAffix));
+            }
         }
 
         public string AffixId
@@ -82,9 +85,24 @@ namespace D4Companion.ViewModels.Entities
                 MarkCorrected();
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(DisplayName));
+                OnPropertyChanged(nameof(SelectedAffix));
                 OnPropertyChanged(nameof(PrismsText));
                 OnPropertyChanged(nameof(HasPrisms));
                 Edited?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        /// <summary>
+        /// The catalog entry for the current affix, for the affix picker. Null when the affix is not in the catalog.
+        /// </summary>
+        public AffixOption? SelectedAffix
+        {
+            get => _catalog.FirstOrDefault(o => string.Equals(o.Id, _affixId, StringComparison.OrdinalIgnoreCase));
+            set
+            {
+                // The picker pushes null while it loads. Never let that wipe the scanned affix.
+                if (value == null) return;
+                AffixId = value.Id;
             }
         }
 

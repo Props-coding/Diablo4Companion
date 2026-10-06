@@ -142,10 +142,10 @@
                                                               ItemsSource="{Binding DataContext.KindOptions, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                               SelectedItem="{Binding Kind, Mode=TwoWay}" />
                                                     <ComboBox Grid.Column="1" Margin="8,0,0,0"
-                                                              IsEditable="True" IsTextSearchEnabled="True" TextSearch.TextPath="Name"
+                                                              IsEditable="False" IsTextSearchEnabled="True" TextSearch.TextPath="Name"
                                                               ItemsSource="{Binding Catalog}"
-                                                              DisplayMemberPath="Name" SelectedValuePath="Id"
-                                                              SelectedValue="{Binding AffixId, Mode=TwoWay}"
+                                                              DisplayMemberPath="Name"
+                                                              SelectedItem="{Binding SelectedAffix, Mode=TwoWay}"
                                                               ToolTip="{Binding OcrText}">
                                                         <ComboBox.ItemsPanel>
                                                             <ItemsPanelTemplate>

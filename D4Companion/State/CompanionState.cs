@@ -144,8 +144,11 @@ namespace D4Companion.State
         public string GetAffixName(string affixId)
         {
             if (string.IsNullOrWhiteSpace(affixId)) return string.Empty;
-            var info = _affixManager.GetAffixInfoByIdName(affixId);
-            return info == null ? affixId : CleanDescription(info.Description);
+            // Scanner and preset ids are the full IdName, which can join several ids with ';'.
+            var info = _affixManager.Affixes.FirstOrDefault(a => a.IdName.Equals(affixId, StringComparison.OrdinalIgnoreCase))
+                ?? _affixManager.GetAffixInfoByIdName(affixId);
+            // Never show raw ids to the user; callers fall back to the scanned text.
+            return info == null ? string.Empty : CleanDescription(info.Description);
         }
 
         public IReadOnlyList<string> GetPrisms(string affixId)

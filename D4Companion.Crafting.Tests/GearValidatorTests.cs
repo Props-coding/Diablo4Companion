@@ -29,6 +29,23 @@ namespace D4Companion.Crafting.Tests
         }
 
         [Test]
+        public void Sanitize_KeepsLongGameDataAffixIdsWhole()
+        {
+            // Game data ids join every internal id of an affix with ';' and can run to thousands of characters.
+            string longId = string.Join(";", Enumerable.Range(0, 400).Select(i => $"CoreStat_Willpower_{i}"));
+            var snapshot = new GearSnapshot
+            {
+                ItemType = "ring",
+                ItemPower = 800,
+                Affixes = new[] { new ScannedAffix { AffixId = longId, Kind = AffixKind.Greater } }
+            };
+
+            var clean = GearValidator.Sanitize(snapshot);
+
+            Assert.That(clean.Affixes[0].AffixId, Is.EqualTo(longId));
+        }
+
+        [Test]
         public void UnknownAffix_CanBeSavedButNotConfirmed()
         {
             var snapshot = new GearSnapshot

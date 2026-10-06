@@ -36,6 +36,12 @@ namespace D4Companion.Crafting
         public const int MaxTextLength = 300;
 
         /// <summary>
+        /// Affix ids from the game data join every internal id of an affix with ';' and can be very long.
+        /// They must never be shortened, or they no longer match the build or the affix list.
+        /// </summary>
+        public const int MaxIdLength = 200_000;
+
+        /// <summary>
         /// Returns a cleaned copy: trimmed and length-limited text, and no NaN or infinite numbers.
         /// </summary>
         public static GearSnapshot Sanitize(GearSnapshot snapshot)
@@ -49,14 +55,14 @@ namespace D4Companion.Crafting
                     .Where(a => a != null)
                     .Select(a => a with
                     {
-                        AffixId = Clean(a.AffixId),
+                        AffixId = Clean(a.AffixId, MaxIdLength),
                         DisplayName = Clean(a.DisplayName),
                         OcrText = Clean(a.OcrText),
                         Value = a.Value.HasValue && double.IsFinite(a.Value.Value) ? a.Value : null,
                         Kind = Enum.IsDefined(a.Kind) ? a.Kind : AffixKind.Unknown,
                         TuningPrisms = (a.TuningPrisms ?? Array.Empty<string>())
                             .Where(p => !string.IsNullOrWhiteSpace(p))
-                            .Select(Clean)
+                            .Select(p => Clean(p))
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList()
                     })
@@ -123,11 +129,13 @@ namespace D4Companion.Crafting
             return new ValidationResult(issues);
         }
 
-        private static string Clean(string? value)
+        private static string Clean(string? value) => Clean(value, MaxTextLength);
+
+        private static string Clean(string? value, int maxLength)
         {
             if (string.IsNullOrWhiteSpace(value)) return string.Empty;
             string trimmed = new string(value.Where(c => !char.IsControl(c)).ToArray()).Trim();
-            return trimmed.Length > MaxTextLength ? trimmed[..MaxTextLength] : trimmed;
+            return trimmed.Length > maxLength ? trimmed[..maxLength] : trimmed;
         }
     }
 }

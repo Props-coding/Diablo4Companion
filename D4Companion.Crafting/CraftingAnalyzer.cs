@@ -50,7 +50,7 @@ namespace D4Companion.Crafting
         public string Name => Scanned?.DisplayName is { Length: > 0 } scannedName ? scannedName
             : Target?.DisplayName is { Length: > 0 } targetName ? targetName
             : Scanned?.OcrText is { Length: > 0 } ocr ? ocr
-            : Target?.AffixId ?? Scanned?.AffixId ?? string.Empty;
+            : "Unknown affix";
     }
 
     public sealed record PrismHint(string AffixName, IReadOnlyList<string> Prisms);
