@@ -69,6 +69,11 @@ namespace D4Companion.State
             BuildTarget = CreateBuildTarget();
 
             WeakReferenceMessenger.Default.Register<TooltipDataReadyMessage>(this, HandleTooltipDataReadyMessage);
+            WeakReferenceMessenger.Default.Register<ToggleOverlayFromGUIMessage>(this, (r, m) => OnUiThread(() =>
+            {
+                IsScannerOn = m.Value.IsEnabled;
+                ScannerStateChanged?.Invoke(this, EventArgs.Empty);
+            }));
             WeakReferenceMessenger.Default.Register<SelectedAffixPresetUpdatedMessage>(this, (r, m) => RefreshBuildTarget());
             WeakReferenceMessenger.Default.Register<AffixPresetChangedMessage>(this, (r, m) => RefreshBuildTarget());
             WeakReferenceMessenger.Default.Register<AffixPresetAddedMessage>(this, (r, m) => RefreshBuildTarget());
@@ -79,6 +84,7 @@ namespace D4Companion.State
         }
 
         public event EventHandler? LiveScanChanged;
+        public event EventHandler? ScannerStateChanged;
         public event EventHandler? BuildTargetChanged;
         public event EventHandler? GearChanged;
         public event EventHandler? AffixCatalogChanged;
@@ -100,6 +106,20 @@ namespace D4Companion.State
 
         public IReadOnlyList<string> PresetNames => _affixManager.AffixPresets.Select(p => p.Name).ToList();
         public string SelectedPresetName => _settingsManager.Settings.SelectedAffixPreset;
+
+        /// <summary>
+        /// The OCR scanner only runs while the overlay is on. The original overlay toggle stays the owner of this state.
+        /// </summary>
+        public bool IsScannerOn { get; private set; }
+
+        public void SetScanner(bool isOn)
+        {
+            // Same message the overlay hotkey uses, so the Builds page toggle, overlay and scanner stay in sync.
+            WeakReferenceMessenger.Default.Send(new ToggleOverlayMessage(new ToggleOverlayMessageParams
+            {
+                IsEnabled = isOn
+            }));
+        }
 
         public void SelectPreset(string presetName)
         {

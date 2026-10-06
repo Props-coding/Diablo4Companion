@@ -21,6 +21,7 @@ namespace D4Companion.ViewModels
             _state.GearChanged += (s, e) => Refresh();
             _state.BuildTargetChanged += (s, e) => Refresh();
             _state.LiveScanChanged += (s, e) => OnPropertyChanged(nameof(ScanStatus));
+            _state.ScannerStateChanged += (s, e) => OnPropertyChanged(nameof(ScanStatus));
 
             OpenAdvisorCommand = new RelayCommand(() => _state.Navigate(CompanionPage.Crafting));
             OpenGearCommand = new RelayCommand(() => _state.Navigate(CompanionPage.Gear));
@@ -37,7 +38,7 @@ namespace D4Companion.ViewModels
 
         public string BuildName => string.IsNullOrWhiteSpace(_state.BuildTarget.Name) ? "No build selected" : _state.BuildTarget.Name;
         public bool HasBuild => !string.IsNullOrWhiteSpace(_state.BuildTarget.Name);
-        public string ScanStatus => _state.LiveScan == null ? "Waiting for a scan" : "Scan ready";
+        public string ScanStatus => !_state.IsScannerOn ? "Off" : _state.LiveScan == null ? "On, waiting for an item" : "Scan ready";
 
         public int SavedCount { get; private set; }
         public int KeepCount { get; private set; }

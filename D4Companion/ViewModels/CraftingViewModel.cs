@@ -70,6 +70,7 @@ namespace D4Companion.ViewModels
             _state = state;
 
             _state.LiveScanChanged += (s, e) => OnLiveScanChanged();
+            _state.ScannerStateChanged += (s, e) => OnLiveScanChanged();
             _state.BuildTargetChanged += (s, e) => OnBuildTargetChanged();
             _state.AffixCatalogChanged += (s, e) => LoadAffixCatalog();
             _state.OpenGearRequested += (s, id) => OpenRecord(id);
@@ -77,6 +78,7 @@ namespace D4Companion.ViewModels
             SlotOptions = CompanionState.GearSlots.Select(id => new SlotOption(id, CompanionState.SlotName(id))).ToList();
 
             CaptureScanCommand = new RelayCommand(CaptureScan, () => _state.LiveScan != null);
+            ToggleScannerCommand = new RelayCommand(() => _state.SetScanner(!_state.IsScannerOn));
             RescanAfterCraftingCommand = new RelayCommand(RescanAfterCrafting, () => _state.LiveScan != null && _currentRecordId != null);
             ConfirmCommand = new RelayCommand(Confirm, () => HasItem);
             SaveCommand = new RelayCommand(Save, () => HasItem);
@@ -93,6 +95,7 @@ namespace D4Companion.ViewModels
         // Commands
 
         public ICommand CaptureScanCommand { get; }
+        public ICommand ToggleScannerCommand { get; }
         public ICommand RescanAfterCraftingCommand { get; }
         public ICommand ConfirmCommand { get; }
         public ICommand SaveCommand { get; }
@@ -130,14 +133,23 @@ namespace D4Companion.ViewModels
 
         public bool IsLiveScanAvailable => _state.LiveScan != null;
 
+        public bool IsScannerOn => _state.IsScannerOn;
+        public string ScannerButtonText => _state.IsScannerOn ? "Turn scanner off" : "Turn scanner on";
+
         public string LiveScanText
         {
             get
             {
                 var live = _state.LiveScan;
-                if (live == null) return "Waiting for a scan. Hover over an item in Diablo IV.";
+                if (live == null)
+                {
+                    return _state.IsScannerOn
+                        ? "Scanner is on. Hover over a piece of gear in Diablo IV until the overlay marks it, then press Capture scan. If nothing happens, check that a system preset for your resolution is selected in Settings."
+                        : "Scanner is off. Press Turn scanner on, then hover over a piece of gear in Diablo IV. Capture scan becomes available once an item has been read.";
+                }
                 string when = _state.LiveScanAtLocal?.ToString("t", CultureInfo.CurrentCulture) ?? string.Empty;
-                return $"Last scanned: {CompanionState.SlotName(live.ItemType)}, item power {live.ItemPower}, {live.Affixes.Count} affixes ({when})";
+                string scanner = _state.IsScannerOn ? string.Empty : " Scanner is off.";
+                return $"Last scanned: {CompanionState.SlotName(live.ItemType)}, item power {live.ItemPower}, {live.Affixes.Count} affixes ({when}).{scanner}";
             }
         }
 
@@ -661,6 +673,8 @@ namespace D4Companion.ViewModels
         {
             OnPropertyChanged(nameof(IsLiveScanAvailable));
             OnPropertyChanged(nameof(LiveScanText));
+            OnPropertyChanged(nameof(IsScannerOn));
+            OnPropertyChanged(nameof(ScannerButtonText));
             RefreshCommands();
         }
 

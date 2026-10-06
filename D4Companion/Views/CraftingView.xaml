@@ -38,6 +38,8 @@
                         <TextBlock Text="Turn a promising drop into your next upgrade, one confirmed step at a time." Style="{StaticResource Companion.Text.Muted}" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="{Binding ScannerButtonText}" Command="{Binding ToggleScannerCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="0,0,10,0"
+                                ToolTip="Same as the overlay switch on the Builds page. The scanner only reads items while it is on." />
                         <Button Content="Capture scan" Command="{Binding CaptureScanCommand}" Style="{StaticResource Companion.Button.Primary}"
                                 ToolTip="Save a copy of the item the scanner is reading right now. The copy will not change when you move the mouse." />
                     </StackPanel>
@@ -82,7 +84,7 @@
                             <Button Grid.Column="1" Content="Clear" Command="{Binding ClearCommand}" Style="{StaticResource Companion.Button.Link}" VerticalAlignment="Top" />
                         </Grid>
 
-                        <TextBlock Text="Capture a scan to start. Hover over an item in Diablo IV with the overlay running, then press Capture scan."
+                        <TextBlock Text="Capture a scan to start. Turn the scanner on, hover over a piece of gear in Diablo IV, then press Capture scan."
                                    Style="{StaticResource Companion.Text.Muted}" Margin="0,12,0,0" Visibility="{Binding HasItem, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
 
                         <StackPanel Visibility="{Binding HasItem, Converter={StaticResource BoolToVisibility}}" Margin="0,14,0,0">
