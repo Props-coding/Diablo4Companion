@@ -32,9 +32,11 @@ namespace D4Companion.ViewModels.Entities
         private AffixStatus? _status;
         private string _explanation = string.Empty;
         private string _issue = string.Empty;
+        private IReadOnlyList<AffixOption> _catalog;
 
-        public ScannedAffixViewModel(ScannedAffix model, Func<string, string> nameLookup, Func<string, IReadOnlyList<string>> prismLookup)
+        public ScannedAffixViewModel(ScannedAffix model, IReadOnlyList<AffixOption> catalog, Func<string, string> nameLookup, Func<string, IReadOnlyList<string>> prismLookup)
         {
+            _catalog = catalog;
             _nameLookup = nameLookup;
             _prismLookup = prismLookup;
             _affixId = model.AffixId;
@@ -52,13 +54,30 @@ namespace D4Companion.ViewModels.Entities
 
         public string OcrText { get; }
 
+        /// <summary>
+        /// What the scanner read from the game, shown under the affix so the user can check it.
+        /// </summary>
+        public string ScannedText => string.IsNullOrWhiteSpace(OcrText) ? string.Empty : "Read from game: " + OcrText.Replace("\r", " ").Replace("\n", " ").Trim();
+        public bool HasScannedText => !string.IsNullOrWhiteSpace(OcrText);
+
+        /// <summary>
+        /// Affixes the user can pick from. Held per row so the list is already there when the
+        /// affix picker first binds its selection.
+        /// </summary>
+        public IReadOnlyList<AffixOption> Catalog
+        {
+            get => _catalog;
+            set => SetProperty(ref _catalog, value);
+        }
+
         public string AffixId
         {
             get => _affixId;
             set
             {
-                value ??= string.Empty;
-                if (value == _affixId) return;
+                // The affix picker pushes null when its list is not loaded yet or the typed text
+                // matches nothing. Never let that wipe the scanned affix.
+                if (value == null || value == _affixId) return;
                 _affixId = value;
                 MarkCorrected();
                 OnPropertyChanged();

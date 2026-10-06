@@ -475,7 +475,7 @@ namespace D4Companion.ViewModels
 
         private ScannedAffixViewModel CreateRow(ScannedAffix affix)
         {
-            var row = new ScannedAffixViewModel(affix, LookupName, id => _state.GetPrisms(id));
+            var row = new ScannedAffixViewModel(affix, _affixCatalog, LookupName, id => _state.GetPrisms(id));
             row.Edited += Row_Edited;
             return row;
         }
@@ -703,6 +703,7 @@ namespace D4Companion.ViewModels
             _affixNames = _affixCatalog.GroupBy(a => a.Id, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
             OnPropertyChanged(nameof(AffixCatalog));
+            foreach (var row in Affixes) row.Catalog = _affixCatalog;
         }
 
         private string LookupName(string affixId)
