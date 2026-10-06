@@ -279,20 +279,48 @@
                                     </TextBlock>
                                 </Expander.Header>
                                 <StackPanel>
-                                    <TextBlock Text="Tell the advisor what this item can no longer take, so it never suggests a step the game will refuse."
+                                    <TextBlock Text="Anything left as Not checked becomes a question to answer in-game before you craft. Answer it here once and the advisor stops asking."
                                                Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,0,0,8" />
-                                    <CheckBox IsChecked="{Binding CannotBeModified}" Margin="0,2">
-                                        <TextBlock Text="Can't be changed any more" Style="{StaticResource Companion.Text}" />
-                                    </CheckBox>
-                                    <CheckBox IsChecked="{Binding NoTempersLeft}" Margin="0,2">
-                                        <TextBlock Text="No tempers left" Style="{StaticResource Companion.Text}" />
-                                    </CheckBox>
-                                    <CheckBox IsChecked="{Binding FullyMasterworked}" Margin="0,2">
-                                        <TextBlock Text="Fully masterworked" Style="{StaticResource Companion.Text}" />
-                                    </CheckBox>
-                                    <TextBlock Text="Enchanted affix (the Occultist allows one per item)" Style="{StaticResource Companion.Text.Muted}" Margin="0,8,0,4" />
-                                    <ComboBox ItemsSource="{Binding EnchantOptions}" SelectedItem="{Binding SelectedEnchant, Mode=TwoWay}"
-                                              DisplayMemberPath="Name" Width="280" HorizontalAlignment="Left" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Can it still be changed?" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3" />
+                                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{x:Static viewModels:CraftingViewModel.CanChangeOptions}" DisplayMemberPath="Name"
+                                                  SelectedValuePath="Key" SelectedValue="{Binding CanChangeKey, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" Margin="0,3" />
+                                        <TextBlock Grid.Row="1" Text="Tempers left?" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3" />
+                                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static viewModels:CraftingViewModel.TemperOptions}" DisplayMemberPath="Name"
+                                                  SelectedValuePath="Key" SelectedValue="{Binding TempersKey, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" Margin="0,3" />
+                                        <TextBlock Grid.Row="2" Text="Masterwork ranks left?" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3" />
+                                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{x:Static viewModels:CraftingViewModel.MasterworkOptions}" DisplayMemberPath="Name"
+                                                  SelectedValuePath="Key" SelectedValue="{Binding MasterworkKey, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" Margin="0,3" />
+                                        <TextBlock Grid.Row="3" Text="Enchanted affix" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3"
+                                                   ToolTip="The Occultist allows one enchanted affix per item." />
+                                        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding EnchantOptions}" SelectedItem="{Binding SelectedEnchant, Mode=TwoWay}"
+                                                  DisplayMemberPath="Name" Width="280" HorizontalAlignment="Left" Margin="0,3" />
+                                    </Grid>
+                                    <StackPanel Margin="0,10,0,0" Visibility="{Binding HasRuledOut, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="Ruled out in-game" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
+                                        <ItemsControl ItemsSource="{Binding RuledOut}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
+                                                        <Run Text="&#x2715;" Foreground="{StaticResource Companion.Brush.Danger}" /> <Run Text="{Binding Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Command="{Binding ClearRuledOutCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,4,0,0">
+                                            <TextBlock Text="Clear ruled-out steps" FontSize="12" />
+                                        </Button>
+                                    </StackPanel>
                                 </StackPanel>
                             </Expander>
 
@@ -373,11 +401,23 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding Label}" Style="{StaticResource Companion.Text}" />
                                                     <TextBlock Grid.Column="1" Text="{Binding When}" Style="{StaticResource Companion.Text.Muted}" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" />
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" />
+                                                        <TextBlock Text="{Binding Tried}" Style="{StaticResource Companion.Text.Muted}" FontSize="12"
+                                                                   Visibility="{Binding HasTried, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock Text="{Binding Result}" Style="{StaticResource Companion.Text}" FontSize="12"
+                                                                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
                                                 </Grid>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+
+                                    <Button Command="{Binding CopyTrialLogCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                            Visibility="{Binding HasHistory, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Copies every saved version of this item, with what was tried and what happened, so you can share a test run.">
+                                        <TextBlock Text="Copy trial log" FontSize="12" />
+                                    </Button>
 
                                     <StackPanel Visibility="{Binding HasChanges, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
                                         <TextBlock Text="{Binding ChangesTitle}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />

@@ -41,6 +41,9 @@ namespace D4Companion.Crafting
         /// </summary>
         public const int MaxIdLength = 200_000;
 
+        /// <summary>At most this many ruled-out steps are kept per item.</summary>
+        public const int MaxRuledOut = 50;
+
         /// <summary>
         /// Returns a cleaned copy: trimmed and length-limited text, and no NaN or infinite numbers.
         /// </summary>
@@ -53,7 +56,13 @@ namespace D4Companion.Crafting
                 Note = Clean(snapshot.Note),
                 CraftState = (snapshot.CraftState ?? new ItemCraftState()) with
                 {
-                    EnchantedAffixId = Clean(snapshot.CraftState?.EnchantedAffixId, MaxIdLength)
+                    EnchantedAffixId = snapshot.CraftState?.EnchantedAffixId == null ? null : Clean(snapshot.CraftState.EnchantedAffixId, MaxIdLength),
+                    RuledOut = (snapshot.CraftState?.RuledOut ?? Array.Empty<RuledOutStep>())
+                        .Where(r => r != null && !string.IsNullOrWhiteSpace(r.Key))
+                        .Select(r => new RuledOutStep(Clean(r.Key, MaxIdLength * 2 + 100), Clean(r.Description)))
+                        .GroupBy(r => r.Key, StringComparer.OrdinalIgnoreCase).Select(g => g.First())
+                        .Take(MaxRuledOut)
+                        .ToList()
                 },
                 Affixes = (snapshot.Affixes ?? Array.Empty<ScannedAffix>())
                     .Where(a => a != null)

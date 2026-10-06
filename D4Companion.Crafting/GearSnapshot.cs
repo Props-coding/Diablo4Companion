@@ -73,17 +73,34 @@ namespace D4Companion.Crafting
 
     /// <summary>
     /// Crafting limits of one item, set by the player. Used to block operations the item can no longer take.
+    /// Null means "not checked yet", which is different from "checked and allowed".
     /// </summary>
     public sealed record ItemCraftState
     {
-        /// <summary>The item can't be changed any more, for example after a transfigure.</summary>
-        public bool CannotBeModified { get; init; }
-        /// <summary>The affix that was enchanted at the Occultist. Empty when none has been.</summary>
-        public string EnchantedAffixId { get; init; } = string.Empty;
-        public bool NoTempersLeft { get; init; }
-        public bool FullyMasterworked { get; init; }
+        /// <summary>The item can't be changed any more, for example after a transfigure. Null: not checked.</summary>
+        public bool? CannotBeModified { get; init; }
+        /// <summary>The affix that was enchanted at the Occultist. Empty: checked, none yet. Null: not checked.</summary>
+        public string? EnchantedAffixId { get; init; }
+        /// <summary>Null: not checked.</summary>
+        public bool? NoTempersLeft { get; init; }
+        /// <summary>Null: not checked.</summary>
+        public bool? FullyMasterworked { get; init; }
+        /// <summary>Steps or goals the player found in-game are not possible on this item.</summary>
+        public IReadOnlyList<RuledOutStep> RuledOut { get; init; } = Array.Empty<RuledOutStep>();
 
         public bool HasEnchant => !string.IsNullOrWhiteSpace(EnchantedAffixId);
+        public bool EnchantChecked => EnchantedAffixId != null;
+        public bool IsRuledOut(string key) => RuledOut.Any(r => string.Equals(r.Key, key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Something the player checked in-game and found not possible. Key identifies it to the advisor;
+    /// Description is what the player sees.
+    /// </summary>
+    public sealed record RuledOutStep(string Key, string Description)
+    {
+        public static string StepKey(string operation, string affectedAffixId, string goalAffixId) => $"step|{operation}|{affectedAffixId}|{goalAffixId}";
+        public static string GoalKey(string goalAffixId) => $"goal|{goalAffixId}";
     }
 
     /// <summary>

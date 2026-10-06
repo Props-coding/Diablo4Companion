@@ -18,7 +18,9 @@
     <Border Style="{StaticResource Companion.Card}">
         <StackPanel>
             <TextBlock Text="NEXT ACTION" Style="{StaticResource Companion.Text.Eyebrow}" />
-            <TextBlock Text="{Binding Headline}" Style="{StaticResource Companion.Text.Headline}" Margin="0,6,0,0" />
+            <TextBlock Text="{Binding CardHeadline}" Style="{StaticResource Companion.Text.Headline}" Margin="0,6,0,0" />
+            <TextBlock Text="{Binding ConditionalStep}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" Margin="0,8,0,0"
+                       Visibility="{Binding NeedsInGameCheck, Converter={StaticResource BoolToVisibility}}" />
 
             <!-- The one instruction: where, which prism, what to aim for. The reasoning is folded away below. -->
             <StackPanel Margin="0,8,0,0" Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
@@ -44,9 +46,49 @@
                 </Border>
             </StackPanel>
 
-            <!-- After crafting, rescanning is the main thing to do. Saving stays secondary. -->
-            <Border Style="{StaticResource Companion.Callout.Info}" Margin="0,12,0,0" Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
+            <!-- Unknowns first: each must be answered in-game before the step is worth spending on. -->
+            <Border Style="{StaticResource Companion.Callout.Warning}" Margin="0,12,0,0" Visibility="{Binding NeedsInGameCheck, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
+                    <TextBlock Text="Look in the game, then answer each one. Don't spend anything yet." Style="{StaticResource Companion.Text}" FontSize="13" />
+                    <ItemsControl ItemsSource="{Binding InGameCheckRows}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource Companion.Text}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <Run x:Name="Mark" Text="?" Foreground="{StaticResource Companion.Brush.Warning}" FontWeight="SemiBold" /> <Run Text="{Binding Text, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <StackPanel x:Name="Answers" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Content="Yes" Style="{StaticResource Companion.Button.Secondary}" Padding="10,3"
+                                                Command="{Binding DataContext.ConfirmCheckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                        <Button Content="No" Style="{StaticResource Companion.Button.Link}" Margin="8,0,0,0"
+                                                ToolTip="Not possible in-game. The step (or the goal, for the slot check) is ruled out for this item and saved in its history."
+                                                Command="{Binding DataContext.RejectCheckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                        <Setter TargetName="Mark" Property="Text" Value="&#x2713;" />
+                                        <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource Companion.Brush.Success}" />
+                                        <Setter TargetName="Answers" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- After crafting, rescanning is the main thing to do. Saving stays secondary. -->
+            <Border Style="{StaticResource Companion.Callout.Info}" Margin="0,12,0,0" Visibility="{Binding ShowCraftAction, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,0,0,6"
+                               Visibility="{Binding HasCheckedInGame, Converter={StaticResource BoolToVisibility}}">
+                        <Run Text="&#x2713;" Foreground="{StaticResource Companion.Brush.Success}" /> <Run Text="You checked this option in-game." />
+                    </TextBlock>
                     <TextBlock Text="Craft in game, then hover the item and rescan." Style="{StaticResource Companion.Text}" FontSize="13" />
                     <Button Content="Rescan item" Command="{Binding RescanAfterCraftingCommand}" Style="{StaticResource Companion.Button.Primary}"
                             HorizontalAlignment="Left" Margin="0,8,0,0"
@@ -73,18 +115,6 @@
                                     <DataTemplate>
                                         <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
                                             <Run Text="&#x2713;" Foreground="{StaticResource Companion.Brush.Success}" /> <Run Text="{Binding Mode=OneWay}" />
-                                        </TextBlock>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                        <StackPanel Margin="0,10,0,0" Visibility="{Binding HasInstructionConfirm, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock Text="Check in-game before you spend" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
-                            <ItemsControl ItemsSource="{Binding InstructionConfirm}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
-                                            <Run Text="?" Foreground="{StaticResource Companion.Brush.Warning}" FontWeight="SemiBold" /> <Run Text="{Binding Mode=OneWay}" />
                                         </TextBlock>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

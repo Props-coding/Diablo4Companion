@@ -11,6 +11,10 @@ namespace D4Companion.Crafting
         public DateTime SavedAtUtc { get; init; } = DateTime.UtcNow;
         public string Label { get; init; } = string.Empty;
         public GearSnapshot Snapshot { get; init; } = new();
+        /// <summary>The crafting step tried before this version, if any. Kept so trials can be reviewed later.</summary>
+        public string Attempt { get; init; } = string.Empty;
+        /// <summary>What happened when that step was tried.</summary>
+        public string Outcome { get; init; } = string.Empty;
     }
 
     /// <summary>
@@ -105,7 +109,7 @@ namespace D4Companion.Crafting
                         if (revision?.Snapshot == null) continue;
                         var clean = GearValidator.Sanitize(revision.Snapshot);
                         if (!GearValidator.Validate(clean).CanSave) continue;
-                        revisions.Add(revision with { Snapshot = clean, Label = revision.Label ?? string.Empty });
+                        revisions.Add(revision with { Snapshot = clean, Label = revision.Label ?? string.Empty, Attempt = revision.Attempt ?? string.Empty, Outcome = revision.Outcome ?? string.Empty });
                     }
 
                     int skipped = (record.Revisions?.Count ?? 0) - revisions.Count;
@@ -155,7 +159,7 @@ namespace D4Companion.Crafting
         /// <summary>
         /// Adds a new version of an existing item, for example after crafting. Earlier versions are kept.
         /// </summary>
-        public GearStoreResult AddRevision(Guid recordId, GearSnapshot snapshot, string label = "After crafting")
+        public GearStoreResult AddRevision(Guid recordId, GearSnapshot snapshot, string label = "After crafting", string attempt = "", string outcome = "")
         {
             var clean = GearValidator.Sanitize(snapshot);
             var validation = GearValidator.Validate(clean);
@@ -180,7 +184,7 @@ namespace D4Companion.Crafting
 
                 var updated = record with
                 {
-                    Revisions = record.Revisions.Append(new GearRevision { Label = label, Snapshot = clean }).ToList()
+                    Revisions = record.Revisions.Append(new GearRevision { Label = label, Snapshot = clean, Attempt = attempt ?? string.Empty, Outcome = outcome ?? string.Empty }).ToList()
                 };
                 _records[index] = updated;
                 Persist();

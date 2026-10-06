@@ -82,6 +82,8 @@ namespace D4Companion.Crafting
         public string PrismId { get; init; } = string.Empty;
         /// <summary>The affix the operation is aimed at, if any.</summary>
         public string AffectedAffix { get; init; } = string.Empty;
+        /// <summary>Id of the affix the operation is aimed at, if any.</summary>
+        public string AffectedAffixId { get; init; } = string.Empty;
         /// <summary>The build stat you are hoping to end up with.</summary>
         public string DesiredAffix { get; init; } = string.Empty;
         /// <summary>Why this operation and this prism.</summary>
@@ -94,6 +96,11 @@ namespace D4Companion.Crafting
         public IReadOnlyList<string> Checked { get; init; } = Array.Empty<string>();
         /// <summary>What only the game can tell you. Check these before spending anything.</summary>
         public IReadOnlyList<string> ConfirmInGame { get; init; } = Array.Empty<string>();
+        /// <summary>The check in ConfirmInGame about whether the goal can exist on this item at all. A "no" rules out the goal, not just this step.</summary>
+        public string GoalCheck { get; init; } = string.Empty;
+
+        /// <summary>Identifies this step, so the player can rule it out after checking in-game.</summary>
+        public string Key => RuledOutStep.StepKey(Operation, AffectedAffixId, Goal?.AffixId ?? string.Empty);
 
         public string PrismName => PrismId.Length == 0 ? string.Empty : PrismNames.Name(PrismId);
 
@@ -483,7 +490,9 @@ namespace D4Companion.Crafting
                 checks.Add("Tempered affixes are changed by tempering at the Blacksmith, not at the cube.");
             }
 
-            AffixComparison? goal = missingRegular.FirstOrDefault();
+            // Goals the player found can't roll on this item are left out. If any are, the item can't reach the build.
+            var blockedGoals = missingRegular.Where(c => state.IsRuledOut(RuledOutStep.GoalKey(c.Target!.AffixId))).ToList();
+            AffixComparison? goal = missingRegular.Except(blockedGoals).FirstOrDefault();
             AffixComparison? candidate = goal == null ? null : BestCandidate(replaceable, goal.Target!, state);
 
             CraftingInstruction? instruction = null;
@@ -495,7 +504,7 @@ namespace D4Companion.Crafting
             int regularCount = comparisons.Count(c => c.Scanned != null && !c.IsDuplicate && c.Scanned.Kind is AffixKind.Normal or AffixKind.Greater);
             var firstImprove = improveRows.FirstOrDefault();
 
-            if (state.CannotBeModified)
+            if (state.CannotBeModified == true)
             {
                 targetStat = (goal ?? missingTempered.FirstOrDefault() ?? firstImprove)?.Name ?? string.Empty;
                 headline = "This item can't be changed";
@@ -513,7 +522,14 @@ namespace D4Companion.Crafting
                     candidateNote = "This is a greater affix. You chose to include greater affixes, but replacing it loses the greater bonus.";
                 }
             }
-            else if (goal != null && regularCount < StandardAffixSlots)
+            else if (blockedGoals.Count > 0)
+            {
+                targetStat = blockedGoals[0].Name;
+                headline = "This item can't reach your build";
+                summary = $"You found in-game that {JoinNames(blockedGoals.Select(c => c.Name).ToList())} can't be added to this {slot}. Look for another base item before spending more on this one.";
+            }
+            else if (goal != null && regularCount < StandardAffixSlots
+                     && !state.IsRuledOut(RuledOutStep.StepKey("Add an Affix", string.Empty, goal.Target!.AffixId)))
             {
                 string prism = goal.Target!.TuningPrisms.FirstOrDefault() ?? string.Empty;
                 var verified = new List<string> { $"Your scan shows {regularCount} regular affixes on this {slot}." };
@@ -533,9 +549,9 @@ namespace D4Companion.Crafting
                     ConfirmInGame = new[]
                     {
                         "The cube offers Add an Affix for this item.",
-                        $"{goal.Name} can roll on a {slot}.",
-                        "If the new affix isn't the one you want, rescan and follow the updated plan."
-                    }
+                        $"{goal.Name} can roll on a {slot}."
+                    },
+                    GoalCheck = $"{goal.Name} can roll on a {slot}."
                 };
                 kind = RecommendationKind.ReviewReroll;
                 headline = "Add an affix";
@@ -548,7 +564,9 @@ namespace D4Companion.Crafting
                 if (candidate != null)
                 {
                     headline = "No safe step left";
-                    summary = $"Changing {candidate.Name} into {goal.Name} would need the Occultist, but this item's enchant is already used on another affix. Decide in-game.";
+                    summary = state.RuledOut.Count > 0
+                        ? $"The steps that could change {candidate.Name} into {goal.Name} were ruled out in-game or aren't safe. Decide in-game, or look for another base item."
+                        : $"Changing {candidate.Name} into {goal.Name} would need the Occultist, but this item's enchant is already used on another affix. Decide in-game.";
                 }
                 else if (protectedGreater.Count > 0)
                 {
@@ -569,10 +587,15 @@ namespace D4Companion.Crafting
             {
                 var tempered = missingTempered[0];
                 targetStat = tempered.Name;
-                if (state.NoTempersLeft)
+                if (state.NoTempersLeft == true)
                 {
                     headline = "No tempers left";
                     summary = $"Your build wants {tempered.Name} as a tempered affix, but you marked this item as having no tempers left.";
+                }
+                else if (state.IsRuledOut(RuledOutStep.StepKey("Temper", string.Empty, tempered.Target!.AffixId)))
+                {
+                    headline = "Tempering ruled out";
+                    summary = $"You found in-game that tempering can't give {tempered.Name} on this item. Look for another base item, or check the build guide.";
                 }
                 else if (tempered.Target!.CanBeTempered == false)
                 {
@@ -583,7 +606,9 @@ namespace D4Companion.Crafting
                 {
                     var verified = new List<string>();
                     if (tempered.Target.CanBeTempered == true) verified.Add($"{tempered.Name} is a tempering affix (game data).");
-                    verified.Add("You haven't marked this item as out of tempers.");
+                    var confirm = new List<string> { $"You have a tempering recipe that can give {tempered.Name}." };
+                    if (state.NoTempersLeft == false) verified.Add("You checked that the item still has tempers left.");
+                    else confirm.Add(CheckTempersLeft);
                     instruction = new CraftingInstruction
                     {
                         Station = "Blacksmith",
@@ -593,11 +618,7 @@ namespace D4Companion.Crafting
                         Reason = $"Your build wants {tempered.Name} as a tempered affix. Tempering adds it without changing your other affixes.",
                         Caveat = $"A tempering recipe can give several results, so {tempered.Name} is not guaranteed.",
                         Checked = verified,
-                        ConfirmInGame = new[]
-                        {
-                            $"You have a tempering recipe that can give {tempered.Name}.",
-                            "The item still has tempers left."
-                        }
+                        ConfirmInGame = confirm
                     };
                     kind = RecommendationKind.ReviewReroll;
                     headline = $"Temper for {tempered.Name}";
@@ -613,10 +634,12 @@ namespace D4Companion.Crafting
                     headline = $"Look for a greater {firstImprove.Name}";
                     summary = $"Your build wants a greater {firstImprove.Name}. Crafting cannot make an existing affix greater, so this usually comes from a better drop.";
                 }
-                else if (state.FullyMasterworked)
+                else if (state.FullyMasterworked == true || state.IsRuledOut(RuledOutStep.StepKey("Masterwork", string.Empty, firstImprove.Target?.AffixId ?? string.Empty)))
                 {
                     headline = $"{firstImprove.Name} is below your minimum";
-                    summary = "You marked this item as fully masterworked, so its values can't be raised further here.";
+                    summary = state.FullyMasterworked == true
+                        ? "You marked this item as fully masterworked, so its values can't be raised further here."
+                        : "You found in-game that masterworking isn't possible on this item, so its values can't be raised further here.";
                 }
                 else
                 {
@@ -628,8 +651,10 @@ namespace D4Companion.Crafting
                         Goal = firstImprove.Target,
                         Reason = $"{firstImprove.Name} is on the item but below your minimum. Masterworking raises affix values without replacing them.",
                         Caveat = "Masterworking may not raise this value enough to reach your minimum.",
-                        Checked = new[] { $"Your scan shows {firstImprove.Name} below the minimum your build sets." },
-                        ConfirmInGame = new[] { "The item has masterwork ranks left." }
+                        Checked = state.FullyMasterworked == false
+                            ? new[] { $"Your scan shows {firstImprove.Name} below the minimum your build sets.", "You checked that the item has masterwork ranks left." }
+                            : new[] { $"Your scan shows {firstImprove.Name} below the minimum your build sets." },
+                        ConfirmInGame = state.FullyMasterworked == false ? Array.Empty<string>() : new[] { CheckMasterworkLeft }
                     };
                     headline = $"Masterwork for {firstImprove.Name}";
                     summary = "All build affixes are present. Some values are below your minimum.";
@@ -639,6 +664,14 @@ namespace D4Companion.Crafting
             {
                 headline = "Review the item";
                 summary = "Some affixes need a closer look before you decide.";
+            }
+
+            // Whether the item can still be changed at all applies to every step.
+            if (instruction != null)
+            {
+                instruction = state.CannotBeModified == false
+                    ? instruction with { Checked = instruction.Checked.Append("You checked that the item can still be changed.").ToList() }
+                    : instruction with { ConfirmInGame = instruction.ConfirmInGame.Prepend(CheckCanChange).ToList() };
             }
 
             return new CraftingRecommendation
@@ -660,6 +693,12 @@ namespace D4Companion.Crafting
                 InGameChecks = checks
             };
         }
+
+        // In-game checks about the item's crafting limits. A "no" answer sets the matching limit.
+        public const string CheckCanChange = "The item can still be changed.";
+        public const string CheckTempersLeft = "The item still has tempers left.";
+        public const string CheckMasterworkLeft = "The item has masterwork ranks left.";
+        public const string CheckNoEnchantYet = "No other affix on this item has been enchanted yet.";
 
         /// <summary>Standard gear carries up to this many regular affixes.</summary>
         public const int StandardAffixSlots = 4;
@@ -722,7 +761,10 @@ namespace D4Companion.Crafting
             var scanned = candidate.Scanned!;
             var target = goal.Target!;
             string shared = SharedPrism(scanned, target);
-            bool enchantAllowed = !state.HasEnchant || IsEnchanted(scanned, state);
+            bool enchantAllowed = (!state.HasEnchant || IsEnchanted(scanned, state))
+                                  && !state.IsRuledOut(RuledOutStep.StepKey("Enchant", scanned.AffixId, target.AffixId));
+            bool focusedAllowed = !state.IsRuledOut(RuledOutStep.StepKey("Focused Reroll", scanned.AffixId, target.AffixId));
+            if (state.IsRuledOut(RuledOutStep.GoalKey(target.AffixId))) return null;
 
             // Other affixes in the same prism group could be the ones that change.
             var atRisk = shared.Length == 0
@@ -737,7 +779,7 @@ namespace D4Companion.Crafting
 
             string slotCheck = $"{goal.Name} can roll on a {slot}.";
 
-            if (shared.Length > 0 && (atRisk.Count == 0 || !enchantAllowed))
+            if (shared.Length > 0 && focusedAllowed && (atRisk.Count == 0 || !enchantAllowed))
             {
                 var verified = new List<string>
                 {
@@ -754,9 +796,11 @@ namespace D4Companion.Crafting
                     AffectedAffix = candidate.Name,
                     DesiredAffix = goal.Name,
                     Goal = target,
+                    AffectedAffixId = scanned.AffixId,
+                    GoalCheck = slotCheck,
                     Reason = atRisk.Count == 0
                         ? $"{candidate.Name} and {goal.Name} are in the same prism group, and {candidate.Name} is the only affix on this item in that group. A Focused Reroll with this prism keeps the result in that group."
-                        : $"This item's enchant is already used on another affix, so the cube is the remaining option. {candidate.Name} and {goal.Name} share this prism group.",
+                        : $"The Occultist can't be used for this (its enchant is used elsewhere or was ruled out), so the cube is the remaining option. {candidate.Name} and {goal.Name} share this prism group.",
                     Caveat = atRisk.Count == 0
                         ? $"Sharing a group doesn't guarantee {goal.Name}. The reroll can land on any affix in the group."
                         : $"Risky: the reroll could change {JoinNames(atRisk)} instead of {candidate.Name}.",
@@ -772,12 +816,12 @@ namespace D4Companion.Crafting
 
             if (!enchantAllowed) return null;
 
-            var enchantChecked = new List<string>
-            {
-                state.HasEnchant
-                    ? $"{candidate.Name} is the affix you marked as enchanted, so the Occultist can still change it."
-                    : "You haven't marked an enchanted affix on this item."
-            };
+            var enchantChecked = new List<string>();
+            var enchantConfirm = new List<string> { $"The Occultist lets you enchant {candidate.Name} on this item." };
+            if (state.HasEnchant) enchantChecked.Add($"{candidate.Name} is the affix you marked as enchanted, so the Occultist can still change it.");
+            else if (state.EnchantChecked) enchantChecked.Add("You checked that no affix on this item is enchanted yet.");
+            else enchantConfirm.Add(CheckNoEnchantYet);
+            enchantConfirm.Add(slotCheck);
             if (shared.Length == 0 && target.TuningPrisms.Count > 0)
             {
                 enchantChecked.Add($"{candidate.Name} is not in the {PrismNames.Name(target.TuningPrisms[0])} group, so a Focused Reroll can't aim for {goal.Name} (game data).");
@@ -790,17 +834,14 @@ namespace D4Companion.Crafting
                 AffectedAffix = candidate.Name,
                 DesiredAffix = goal.Name,
                 Goal = target,
+                AffectedAffixId = scanned.AffixId,
+                GoalCheck = slotCheck,
                 Reason = atRisk.Count > 0
                     ? $"{candidate.Name} is not in your build. A cube reroll in this prism group could also hit {JoinNames(atRisk)}, so enchanting is safer: it changes only the affix you pick, and you can keep the original if the options are worse."
                     : $"{candidate.Name} is not in your build. Enchanting changes only the affix you pick, and you can keep the original if the options are worse.",
-                Caveat = $"{goal.Name} may not be among the options. Only one affix per item can be enchanted.",
+                Caveat = $"{goal.Name} may not be among the options. If it isn't, keep the original. Only one affix per item can be enchanted.",
                 Checked = enchantChecked,
-                ConfirmInGame = new[]
-                {
-                    $"The Occultist lets you enchant {candidate.Name} on this item.",
-                    $"{goal.Name} is offered. If it isn't, keep the original.",
-                    slotCheck
-                }
+                ConfirmInGame = enchantConfirm
             };
         }
 

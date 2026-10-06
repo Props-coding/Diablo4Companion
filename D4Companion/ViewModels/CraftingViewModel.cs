@@ -46,13 +46,29 @@ namespace D4Companion.ViewModels
         public bool IsFirst => Number == 1;
     }
 
-    public sealed record EnchantOption(string Id, string Name);
+    /// <summary>Id null: not checked. Id empty: checked, no affix enchanted yet.</summary>
+    public sealed record EnchantOption(string? Id, string Name);
+
+    /// <summary>One answer for a crafting limit. Key "" is not checked, "yes" is allowed, "no" is blocked.</summary>
+    public sealed record LimitOption(string Key, string Name);
+
+    /// <summary>Something to check in the game before spending anything on the current step.</summary>
+    public sealed class InGameCheckRowViewModel
+    {
+        public string Text { get; init; } = string.Empty;
+        public bool IsDone { get; init; }
+        public bool IsOpen => !IsDone;
+    }
 
     public sealed class HistoryRowViewModel
     {
         public string Label { get; init; } = string.Empty;
         public string When { get; init; } = string.Empty;
         public string Summary { get; init; } = string.Empty;
+        public string Tried { get; init; } = string.Empty;
+        public bool HasTried => Tried.Length > 0;
+        public string Result { get; init; } = string.Empty;
+        public bool HasResult => Result.Length > 0;
     }
 
     public sealed class ChangeRowViewModel
@@ -88,6 +104,11 @@ namespace D4Companion.ViewModels
         private bool _isEditing;
         private bool _includeGreaterAffixes;
         private ItemCraftState _craftState = new();
+        // In-game checks the player has answered "yes" to for this item. Kept across rescans of the same item.
+        private readonly HashSet<string> _confirmedChecks = new(StringComparer.Ordinal);
+        // What the next saved version records as tried and what happened, for trial logs.
+        private string _pendingAttempt = string.Empty;
+        private string _pendingOutcome = string.Empty;
 
         public CraftingViewModel(ILogger<CraftingViewModel> logger, CompanionState state)
         {
@@ -113,6 +134,10 @@ namespace D4Companion.ViewModels
             OpenBuildsCommand = new RelayCommand(() => _state.Navigate(CompanionPage.Builds));
             OpenGearCommand = new RelayCommand(() => _state.Navigate(CompanionPage.Gear));
             EditScanCommand = new RelayCommand(() => IsEditing = !IsEditing, () => HasItem);
+            ConfirmCheckCommand = new RelayCommand<InGameCheckRowViewModel>(ConfirmCheck);
+            RejectCheckCommand = new RelayCommand<InGameCheckRowViewModel>(RejectCheck);
+            ClearRuledOutCommand = new RelayCommand(() => SetCraftState(_craftState with { RuledOut = Array.Empty<RuledOutStep>() }));
+            CopyTrialLogCommand = new RelayCommand(CopyTrialLog);
 
             LoadAffixCatalog();
             RefreshPresets();
@@ -132,6 +157,10 @@ namespace D4Companion.ViewModels
         public ICommand OpenBuildsCommand { get; }
         public ICommand OpenGearCommand { get; }
         public ICommand EditScanCommand { get; }
+        public ICommand ConfirmCheckCommand { get; }
+        public ICommand RejectCheckCommand { get; }
+        public ICommand ClearRuledOutCommand { get; }
+        public ICommand CopyTrialLogCommand { get; }
 
         // Build selection
 
@@ -377,29 +406,49 @@ namespace D4Companion.ViewModels
 
         // Crafting limits: what the player told us the item can no longer take.
 
-        public bool CannotBeModified
+        // "Not checked" is kept apart from "allowed": an unchecked limit becomes an in-game check on the step.
+
+        public static IReadOnlyList<LimitOption> CanChangeOptions { get; } = new[]
         {
-            get => _craftState.CannotBeModified;
-            set => SetCraftState(_craftState with { CannotBeModified = value });
+            new LimitOption("", "Not checked"), new LimitOption("yes", "Yes"), new LimitOption("no", "No, it's locked")
+        };
+        public static IReadOnlyList<LimitOption> TemperOptions { get; } = new[]
+        {
+            new LimitOption("", "Not checked"), new LimitOption("yes", "Yes, tempers left"), new LimitOption("no", "No tempers left")
+        };
+        public static IReadOnlyList<LimitOption> MasterworkOptions { get; } = new[]
+        {
+            new LimitOption("", "Not checked"), new LimitOption("yes", "Yes, ranks left"), new LimitOption("no", "Fully masterworked")
+        };
+
+        public string CanChangeKey
+        {
+            get => ToKey(_craftState.CannotBeModified);
+            set => SetCraftState(_craftState with { CannotBeModified = FromKey(value) });
         }
 
-        public bool NoTempersLeft
+        public string TempersKey
         {
-            get => _craftState.NoTempersLeft;
-            set => SetCraftState(_craftState with { NoTempersLeft = value });
+            get => ToKey(_craftState.NoTempersLeft);
+            set => SetCraftState(_craftState with { NoTempersLeft = FromKey(value) });
         }
 
-        public bool FullyMasterworked
+        public string MasterworkKey
         {
-            get => _craftState.FullyMasterworked;
-            set => SetCraftState(_craftState with { FullyMasterworked = value });
+            get => ToKey(_craftState.FullyMasterworked);
+            set => SetCraftState(_craftState with { FullyMasterworked = FromKey(value) });
         }
+
+        // The limits are stored as "blocked?": null not checked, false allowed ("yes"), true blocked ("no").
+        private static string ToKey(bool? blocked) => blocked switch { null => "", false => "yes", true => "no" };
+        private static bool? FromKey(string? key) => key switch { "yes" => false, "no" => true, _ => null };
 
         public ObservableCollection<EnchantOption> EnchantOptions { get; } = new();
 
         public EnchantOption? SelectedEnchant
         {
-            get => EnchantOptions.FirstOrDefault(o => string.Equals(o.Id, _craftState.EnchantedAffixId, StringComparison.OrdinalIgnoreCase))
+            get => EnchantOptions.FirstOrDefault(o => o.Id == null ? _craftState.EnchantedAffixId == null
+                                                                   : string.Equals(o.Id, _craftState.EnchantedAffixId, StringComparison.OrdinalIgnoreCase))
                    ?? EnchantOptions.FirstOrDefault();
             set
             {
@@ -408,16 +457,25 @@ namespace D4Companion.ViewModels
             }
         }
 
+        public IReadOnlyList<string> RuledOut => _craftState.RuledOut.Select(r => r.Description).ToList();
+        public bool HasRuledOut => _craftState.RuledOut.Count > 0;
+
         public string CraftLimitsSummary
         {
             get
             {
                 var parts = new List<string>();
-                if (_craftState.CannotBeModified) parts.Add("can't be changed");
-                if (_craftState.HasEnchant) parts.Add("enchant used on " + LookupName(_craftState.EnchantedAffixId));
-                if (_craftState.NoTempersLeft) parts.Add("no tempers left");
-                if (_craftState.FullyMasterworked) parts.Add("fully masterworked");
-                return parts.Count == 0 ? "None marked" : string.Join(", ", parts);
+                if (_craftState.CannotBeModified == true) parts.Add("can't be changed");
+                if (_craftState.HasEnchant) parts.Add("enchant used on " + LookupName(_craftState.EnchantedAffixId!));
+                if (_craftState.NoTempersLeft == true) parts.Add("no tempers left");
+                if (_craftState.FullyMasterworked == true) parts.Add("fully masterworked");
+                if (_craftState.RuledOut.Count > 0) parts.Add($"{_craftState.RuledOut.Count} ruled out");
+
+                int notChecked = new[] { _craftState.CannotBeModified, _craftState.NoTempersLeft, _craftState.FullyMasterworked }.Count(v => v == null)
+                                 + (_craftState.EnchantChecked ? 0 : 1);
+                if (notChecked == 4 && parts.Count == 0) return "Not checked";
+                if (notChecked > 0) parts.Add($"{notChecked} not checked");
+                return parts.Count == 0 ? "Checked, nothing blocked" : string.Join(" · ", parts);
             }
         }
 
@@ -432,17 +490,20 @@ namespace D4Companion.ViewModels
 
         private void OnCraftStateChanged()
         {
-            OnPropertyChanged(nameof(CannotBeModified));
-            OnPropertyChanged(nameof(NoTempersLeft));
-            OnPropertyChanged(nameof(FullyMasterworked));
+            OnPropertyChanged(nameof(CanChangeKey));
+            OnPropertyChanged(nameof(TempersKey));
+            OnPropertyChanged(nameof(MasterworkKey));
             OnPropertyChanged(nameof(SelectedEnchant));
+            OnPropertyChanged(nameof(RuledOut));
+            OnPropertyChanged(nameof(HasRuledOut));
             OnPropertyChanged(nameof(CraftLimitsSummary));
         }
 
         private void RefreshEnchantOptions()
         {
             EnchantOptions.Clear();
-            EnchantOptions.Add(new EnchantOption(string.Empty, "No affix enchanted yet"));
+            EnchantOptions.Add(new EnchantOption(null, "Not checked"));
+            EnchantOptions.Add(new EnchantOption(string.Empty, "None yet"));
             foreach (var row in Affixes.Where(a => !string.IsNullOrWhiteSpace(a.AffixId)))
             {
                 if (EnchantOptions.Any(o => string.Equals(o.Id, row.AffixId, StringComparison.OrdinalIgnoreCase))) continue;
@@ -484,6 +545,16 @@ namespace D4Companion.ViewModels
         public IReadOnlyList<string> InstructionConfirm => Instruction?.ConfirmInGame ?? Array.Empty<string>();
         public bool HasInstructionConfirm => InstructionConfirm.Count > 0;
         public string InstructionPlace => Instruction == null ? string.Empty : $"At the {Instruction.Station}";
+
+        /// <summary>The step's in-game checks, each marked when the player has answered "yes".</summary>
+        public IReadOnlyList<InGameCheckRowViewModel> InGameCheckRows =>
+            InstructionConfirm.Select(c => new InGameCheckRowViewModel { Text = c, IsDone = _confirmedChecks.Contains(c) }).ToList();
+        /// <summary>Something about the step is still unknown, so the next action is to check it in-game, not to craft.</summary>
+        public bool NeedsInGameCheck => HasInstruction && InstructionConfirm.Any(c => !_confirmedChecks.Contains(c));
+        public bool ShowCraftAction => HasInstruction && !NeedsInGameCheck;
+        public string CardHeadline => NeedsInGameCheck ? "Check this option in-game" : Headline;
+        public string ConditionalStep => NeedsInGameCheck ? $"If it checks out: {Headline}" : string.Empty;
+        public bool HasCheckedInGame => HasInstruction && HasInstructionConfirm && !NeedsInGameCheck;
 
         // Kept separate: having the target affixes is not the same as meeting every requirement.
         public string AffixesStatement => ShowRecommendation ? _analysis?.AffixesStatement ?? string.Empty : string.Empty;
@@ -555,6 +626,7 @@ namespace D4Companion.ViewModels
             var live = _state.LiveScan;
             if (live == null) return;
 
+            ResetTrialState();
             _currentRecordId = null;
             _isAfterCraftingDraft = false;
             LoadSnapshot(live);
@@ -593,6 +665,7 @@ namespace D4Companion.ViewModels
 
             // Carry over Keep marks for affixes that are still on the item, and the item's crafting limits.
             var kept = Affixes.Where(a => a.IsKeep).Select(a => a.AffixId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var step = Instruction;
             var craftState = DetectEnchant(_analysis?.Recommendation, before, live, _craftState, out string enchantNote);
             var snapshot = live with
             {
@@ -600,10 +673,19 @@ namespace D4Companion.ViewModels
                 CraftState = craftState
             };
 
+            // Record what was tried and what the scans show happened, for the trial log.
+            string result = string.Empty;
+            if (step != null)
+            {
+                _pendingAttempt = CraftTrial.Attempt(step);
+                _pendingOutcome = CraftTrial.Describe(CraftTrial.Judge(step, before, snapshot), step);
+                result = _pendingOutcome + " ";
+            }
+
             _isAfterCraftingDraft = true;
             LoadSnapshot(snapshot);
             HasUnsavedChanges = true;
-            StatusMessage = "New scan captured after crafting. Check it and confirm it to get the updated plan." + enchantNote;
+            StatusMessage = result + "Check the new scan and confirm it to get the updated plan." + enchantNote;
             RefreshHistory();
         }
 
@@ -635,6 +717,83 @@ namespace D4Companion.ViewModels
 
             note = " Mark which affix you enchanted under Crafting limits.";
             return state;
+        }
+
+        private void ResetTrialState()
+        {
+            _confirmedChecks.Clear();
+            _pendingAttempt = _pendingOutcome = string.Empty;
+        }
+
+        private void ConfirmCheck(InGameCheckRowViewModel? row)
+        {
+            if (row == null || !HasInstruction) return;
+            _confirmedChecks.Add(row.Text);
+            Analyze();
+        }
+
+        /// <summary>
+        /// The player found in-game that a check fails. Limits about the item are set directly; anything else
+        /// rules out this step (or the goal, when it can't roll on the item). The attempt is saved for the trial log.
+        /// </summary>
+        private void RejectCheck(InGameCheckRowViewModel? row)
+        {
+            if (row == null || Instruction is not CraftingInstruction step) return;
+
+            // Save anything unsaved first, so a rescan result isn't overwritten by this entry.
+            if (HasUnsavedChanges || _currentRecordId == null)
+            {
+                Save();
+                if (HasUnsavedChanges || _currentRecordId == null) return;
+            }
+
+            string slot = CompanionState.SlotName(_itemType).ToLowerInvariant();
+            string goalId = step.Goal?.AffixId ?? string.Empty;
+            ItemCraftState state = row.Text switch
+            {
+                CraftingAnalyzer.CheckCanChange => _craftState with { CannotBeModified = true },
+                CraftingAnalyzer.CheckTempersLeft => _craftState with { NoTempersLeft = true },
+                CraftingAnalyzer.CheckMasterworkLeft => _craftState with { FullyMasterworked = true },
+                _ when row.Text == step.GoalCheck && goalId.Length > 0 => _craftState with
+                {
+                    RuledOut = _craftState.RuledOut.Append(new RuledOutStep(RuledOutStep.GoalKey(goalId), $"{step.DesiredAffix} can't roll on this {slot}")).ToList()
+                },
+                _ => _craftState with
+                {
+                    RuledOut = _craftState.RuledOut.Append(new RuledOutStep(step.Key,
+                        $"{step.Operation}{(step.AffectedAffix.Length > 0 ? " on " + step.AffectedAffix : string.Empty)} (failed check: {row.Text.TrimEnd('.')})")).ToList()
+                }
+            };
+
+            _pendingAttempt = CraftTrial.Attempt(step);
+            _pendingOutcome = $"Not possible in-game: {row.Text}";
+            _isAfterCraftingDraft = false;
+            SetCraftState(state);
+            Save();
+            StatusMessage = row.Text == CraftingAnalyzer.CheckNoEnchantYet
+                ? "Noted. Mark which affix is enchanted under Crafting limits. The plan has been updated."
+                : $"Noted that this isn't possible: {row.Text} The plan has been updated.";
+        }
+
+        private void CopyTrialLog()
+        {
+            var record = _currentRecordId is Guid id ? _state.Store.Find(id) : null;
+            if (record == null)
+            {
+                StatusMessage = "Save the item first. The trial log is built from its saved versions.";
+                return;
+            }
+
+            try
+            {
+                System.Windows.Clipboard.SetText(CraftTrial.FormatLog(record, ItemTitle, LookupName));
+                StatusMessage = "Trial log copied. Paste it into your notes or a message.";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name);
+                StatusMessage = "Couldn't copy the trial log. Try again.";
+            }
         }
 
         private static bool SameAffixes(GearSnapshot a, GearSnapshot b) =>
@@ -679,7 +838,9 @@ namespace D4Companion.ViewModels
                 GearStoreResult result;
                 if (_currentRecordId is Guid recordId && _state.Store.Find(recordId) != null)
                 {
-                    result = _state.Store.AddRevision(recordId, snapshot, _isAfterCraftingDraft ? "After crafting" : "Corrected");
+                    result = _isAfterCraftingDraft || _pendingOutcome.Length > 0
+                        ? _state.Store.AddRevision(recordId, snapshot, _isAfterCraftingDraft ? "After crafting" : "Blocked in game", _pendingAttempt, _pendingOutcome)
+                        : _state.Store.AddRevision(recordId, snapshot, "Corrected");
                 }
                 else
                 {
@@ -693,6 +854,7 @@ namespace D4Companion.ViewModels
                 }
 
                 _currentRecordId = result.Record.Id;
+                _pendingAttempt = _pendingOutcome = string.Empty;
                 HasUnsavedChanges = false;
                 StatusMessage = IsConfirmed ? "Saved to My Gear." : "Saved to My Gear. Confirm the item to get a recommendation.";
                 _isAfterCraftingDraft = false;
@@ -734,6 +896,7 @@ namespace D4Companion.ViewModels
             _itemPowerText = string.Empty;
             _rarity = string.Empty;
             _isUnique = false;
+            ResetTrialState();
             _craftState = new ItemCraftState();
             EnchantOptions.Clear();
             HasItem = false;
@@ -753,6 +916,7 @@ namespace D4Companion.ViewModels
             var latest = record?.Latest;
             if (record == null || latest == null) return;
 
+            ResetTrialState();
             _currentRecordId = record.Id;
             _isAfterCraftingDraft = false;
             LoadSnapshot(latest.Snapshot);
@@ -980,7 +1144,9 @@ namespace D4Companion.ViewModels
                          nameof(InstructionCaveat), nameof(HasInstructionCaveat),
                          nameof(InstructionChecked), nameof(HasInstructionChecked), nameof(InstructionConfirm), nameof(HasInstructionConfirm),
                          nameof(InstructionPlace), nameof(AffixesStatement), nameof(ValuesStatement), nameof(GreaterStatement),
-                         nameof(HasCompletion), nameof(HasPlanCard), nameof(ShowSummary), nameof(ShowNextActionBar) })
+                         nameof(HasCompletion), nameof(HasPlanCard), nameof(ShowSummary), nameof(ShowNextActionBar),
+                         nameof(InGameCheckRows), nameof(NeedsInGameCheck), nameof(ShowCraftAction), nameof(CardHeadline),
+                         nameof(ConditionalStep), nameof(HasCheckedInGame) })
             {
                 OnPropertyChanged(name);
             }
@@ -1002,7 +1168,9 @@ namespace D4Companion.ViewModels
                         Label = revision.Label,
                         When = revision.SavedAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
                         Summary = $"Item power {revision.Snapshot.ItemPower}, {revision.Snapshot.Affixes.Count} affixes" +
-                                  (revision.Snapshot.IsConfirmed ? ", confirmed" : string.Empty)
+                                  (revision.Snapshot.IsConfirmed ? ", confirmed" : string.Empty),
+                        Tried = revision.Attempt.Length > 0 ? "Tried: " + revision.Attempt : string.Empty,
+                        Result = revision.Outcome.Length > 0 ? "Result: " + revision.Outcome : string.Empty
                     });
                 }
 
