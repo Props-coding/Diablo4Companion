@@ -305,6 +305,8 @@ namespace D4Companion.State
                 ItemPower = tooltip.ItemPower,
                 Rarity = tooltip.IsUniqueItem ? ItemRarityConstants.Unique : tooltip.ItemRarity,
                 IsUnique = tooltip.IsUniqueItem,
+                UniqueId = tooltip.IsUniqueItem ? tooltip.ItemAspect?.Id ?? string.Empty : string.Empty,
+                UniqueName = tooltip.IsUniqueItem ? GetUniqueName(tooltip.ItemAspect?.Id) : string.Empty,
                 Affixes = affixes,
                 IsConfirmed = false
             });
@@ -330,6 +332,13 @@ namespace D4Companion.State
                 BuildTarget = CreateBuildTarget();
                 BuildTargetChanged?.Invoke(this, EventArgs.Empty);
             });
+        }
+
+        private string GetUniqueName(string? uniqueId)
+        {
+            if (string.IsNullOrWhiteSpace(uniqueId)) return string.Empty;
+            var info = _affixManager.Uniques.FirstOrDefault(u => string.Equals(u.IdName, uniqueId, StringComparison.OrdinalIgnoreCase));
+            return info?.Name ?? string.Empty;
         }
 
         private BuildTarget CreateBuildTarget()
@@ -366,7 +375,13 @@ namespace D4Companion.State
                     .Select(g => g.First() with { RequireGreater = g.Any(t => t.RequireGreater) })
                     .ToList();
 
-                return new BuildTarget { Name = preset.Name, Affixes = targets };
+                var uniques = preset.ItemUniques
+                    .Where(u => u != null && !string.IsNullOrWhiteSpace(u.Id))
+                    .Select(u => new BuildUnique(u.Id, GetUniqueName(u.Id)))
+                    .DistinctBy(u => u.Id.ToLowerInvariant())
+                    .ToList();
+
+                return new BuildTarget { Name = preset.Name, Affixes = targets, Uniques = uniques };
             }
             catch (Exception ex)
             {

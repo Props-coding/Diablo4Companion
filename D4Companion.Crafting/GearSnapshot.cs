@@ -58,6 +58,9 @@ namespace D4Companion.Crafting
         public int ItemPower { get; init; }
         public string Rarity { get; init; } = string.Empty;
         public bool IsUnique { get; init; }
+        /// <summary>Which unique the scanner recognised, if any. Empty when unknown.</summary>
+        public string UniqueId { get; init; } = string.Empty;
+        public string UniqueName { get; init; } = string.Empty;
         public IReadOnlyList<ScannedAffix> Affixes { get; init; } = Array.Empty<ScannedAffix>();
         /// <summary>
         /// The user checked every value and confirmed the item. Recommendations require this.
@@ -129,10 +132,14 @@ namespace D4Companion.Crafting
     /// <summary>
     /// A frozen copy of the selected build (affix preset).
     /// </summary>
+    public sealed record BuildUnique(string Id, string Name);
+
     public sealed record BuildTarget
     {
         public string Name { get; init; } = string.Empty;
         public IReadOnlyList<TargetAffix> Affixes { get; init; } = Array.Empty<TargetAffix>();
+        /// <summary>Unique items the build uses. Imports don't say which slot each one is for.</summary>
+        public IReadOnlyList<BuildUnique> Uniques { get; init; } = Array.Empty<BuildUnique>();
 
         public IReadOnlyList<TargetAffix> ForItemType(string itemType)
         {

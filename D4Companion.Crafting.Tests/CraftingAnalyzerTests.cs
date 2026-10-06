@@ -280,6 +280,47 @@ namespace D4Companion.Crafting.Tests
             var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance")));
 
             Assert.That(result.Verdict, Is.EqualTo(CraftingVerdict.NotApplicable));
+            Assert.That(result.Recommendation.Instruction, Is.Null);
+        }
+
+        [Test]
+        public void UniqueInBuild_IsRecognisedAndItsAffixesCompared()
+        {
+            var item = Ring(Affix("CritChance"), Affix("Willpower")) with { IsUnique = true, UniqueId = "Ring_Unique_Generic_103", UniqueName = "Wendigo Brand" };
+            var build = Build(Target("CritChance"), Target("AttackSpeed")) with { Uniques = new[] { new BuildUnique("Ring_Unique_Generic_103", "Wendigo Brand") } };
+
+            var result = CraftingAnalyzer.Analyze(item, build);
+
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Wendigo Brand is in your build"));
+            Assert.That(result.Recommendation.Instruction, Is.Null);
+            Assert.That(result.Comparisons.Single(c => c.Name == "CritChance").Status, Is.EqualTo(AffixStatus.Match));
+            Assert.That(result.Comparisons.Single(c => c.Name == "Willpower").IsOffTarget, Is.True);
+            Assert.That(result.Comparisons, Has.None.Matches<AffixComparison>(c => c.Status == AffixStatus.Missing),
+                "The other ring's build affixes must not be reported as missing from the unique.");
+            Assert.That(result.BuildMatchStatement, Is.EqualTo("1 of this unique's 2 affixes are in your build for this slot."));
+        }
+
+        [Test]
+        public void UniqueNotInBuild_SaysWhichUniquesTheBuildUses()
+        {
+            var item = Ring(Affix("CritChance")) with { IsUnique = true, UniqueId = "Ring_Other", UniqueName = "Other Ring" };
+            var build = Build(Target("CritChance")) with { Uniques = new[] { new BuildUnique("Ring_Unique_Generic_103", "Wendigo Brand") } };
+
+            var result = CraftingAnalyzer.Analyze(item, build);
+
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Other Ring isn't in your build"));
+            Assert.That(result.Recommendation.Summary, Does.Contain("Wendigo Brand"));
+        }
+
+        [Test]
+        public void UnrecognisedUnique_SaysSo()
+        {
+            var item = Ring(Affix("CritChance")) with { IsUnique = true };
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance")));
+
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Unique item"));
+            Assert.That(result.Recommendation.Summary, Does.Contain("couldn't tell which unique"));
         }
 
         [Test]

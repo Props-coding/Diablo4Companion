@@ -94,6 +94,8 @@ namespace D4Companion.ViewModels
         private string _itemPowerText = string.Empty;
         private string _rarity = string.Empty;
         private bool _isUnique;
+        private string _uniqueId = string.Empty;
+        private string _uniqueName = string.Empty;
         private bool _isConfirmed;
         private bool _hasUnsavedChanges;
         private Guid? _currentRecordId;
@@ -253,7 +255,9 @@ namespace D4Companion.ViewModels
         public bool IsReading => !_isEditing;
         public string EditButtonText => _isEditing ? "Done editing" : "Edit scan";
 
-        public string ItemName => HasItem ? CompanionState.SlotName(_itemType) : "No item yet";
+        public string ItemName => !HasItem ? "No item yet"
+            : _isUnique && _uniqueName.Length > 0 ? $"{_uniqueName} · {CompanionState.SlotName(_itemType)}"
+            : CompanionState.SlotName(_itemType);
 
         public string ItemDetails
         {
@@ -263,7 +267,7 @@ namespace D4Companion.ViewModels
                 var parts = new List<string>();
                 if (!string.IsNullOrWhiteSpace(_itemPowerText)) parts.Add($"{_itemPowerText} Item Power");
                 if (!string.IsNullOrWhiteSpace(_rarity)) parts.Add(CultureInfo.CurrentCulture.TextInfo.ToTitleCase(_rarity.ToLowerInvariant()));
-                if (_isUnique) parts.Add("Unique");
+                if (_isUnique && !string.Equals(_rarity, "Unique", StringComparison.OrdinalIgnoreCase)) parts.Add("Unique");
                 return string.Join(" · ", parts);
             }
         }
@@ -896,6 +900,7 @@ namespace D4Companion.ViewModels
             _itemPowerText = string.Empty;
             _rarity = string.Empty;
             _isUnique = false;
+            _uniqueId = _uniqueName = string.Empty;
             ResetTrialState();
             _craftState = new ItemCraftState();
             EnchantOptions.Clear();
@@ -943,6 +948,8 @@ namespace D4Companion.ViewModels
             _itemPowerText = snapshot.ItemPower > 0 ? snapshot.ItemPower.ToString(CultureInfo.CurrentCulture) : string.Empty;
             _rarity = snapshot.Rarity;
             _isUnique = snapshot.IsUnique;
+            _uniqueId = snapshot.UniqueId ?? string.Empty;
+            _uniqueName = snapshot.UniqueName ?? string.Empty;
             _craftState = snapshot.CraftState ?? new ItemCraftState();
             RefreshEnchantOptions();
             OnCraftStateChanged();
@@ -1013,6 +1020,8 @@ namespace D4Companion.ViewModels
                 ItemPower = itemPower,
                 Rarity = _rarity,
                 IsUnique = _isUnique,
+                UniqueId = _isUnique ? _uniqueId : string.Empty,
+                UniqueName = _isUnique ? _uniqueName : string.Empty,
                 CraftState = _craftState,
                 Affixes = affixes,
                 IsConfirmed = IsConfirmed

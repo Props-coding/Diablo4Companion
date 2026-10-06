@@ -197,20 +197,6 @@ namespace D4Companion.Crafting
                 };
             }
 
-            if (snapshot.IsUnique)
-            {
-                return new CraftingAnalysis
-                {
-                    Verdict = CraftingVerdict.NotApplicable,
-                    Recommendation = new CraftingRecommendation
-                    {
-                        Kind = RecommendationKind.NoAdvice,
-                        Headline = "Unique item",
-                        Summary = "Unique items are not compared with affix targets in this version."
-                    }
-                };
-            }
-
             var targets = build?.ForItemType(snapshot.ItemType) ?? Array.Empty<TargetAffix>();
             var affixes = snapshot.Affixes ?? Array.Empty<ScannedAffix>();
             var comparisons = new List<AffixComparison>();
@@ -253,6 +239,11 @@ namespace D4Companion.Crafting
                         Explanation = "This affix appears twice. That is usually a scan mistake."
                     });
                 }
+            }
+
+            if (snapshot.IsUnique)
+            {
+                return AnalyzeUnique(snapshot, build, targets, affixes, comparisons, used, needsCorrection);
             }
 
             if (targets.Count == 0)
@@ -842,6 +833,92 @@ namespace D4Companion.Crafting
                 Caveat = $"{goal.Name} may not be among the options. If it isn't, keep the original. Only one affix per item can be enchanted.",
                 Checked = enchantChecked,
                 ConfirmInGame = enchantConfirm
+            };
+        }
+
+        /// <summary>
+        /// Unique items: say whether the build uses this unique and how its affixes line up with the slot's
+        /// build affixes. No crafting step is suggested, and nothing is reported as missing, because an import
+        /// doesn't say which build affixes belong to the unique (two rings share one slot type).
+        /// </summary>
+        private static CraftingAnalysis AnalyzeUnique(GearSnapshot snapshot, BuildTarget? build, IReadOnlyList<TargetAffix> targets,
+            IReadOnlyList<ScannedAffix> affixes, List<AffixComparison> comparisons, bool[] used, bool needsCorrection)
+        {
+            if (needsCorrection)
+            {
+                return new CraftingAnalysis { Verdict = CraftingVerdict.NeedsCorrection, Comparisons = comparisons, Recommendation = CorrectScanRecommendation() };
+            }
+
+            int matches = 0;
+            for (int i = 0; i < affixes.Count; i++)
+            {
+                if (used[i]) continue;
+                var affix = affixes[i];
+                var target = targets
+                    .Where(t => string.Equals(t.AffixId, affix.AffixId, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(t => t.IsTempered == (affix.Kind == AffixKind.Tempered) ? 1 : 0)
+                    .FirstOrDefault();
+                if (target == null)
+                {
+                    comparisons.Add(new AffixComparison
+                    {
+                        Scanned = affix,
+                        ScannedIndex = i,
+                        Status = AffixStatus.Review,
+                        IsOffTarget = true,
+                        Explanation = "Part of this unique. Your build doesn't list it for this slot."
+                    });
+                    continue;
+                }
+
+                var (status, explanation) = Evaluate(target, affix);
+                if (status == AffixStatus.Match) matches++;
+                comparisons.Add(new AffixComparison { Target = target, Scanned = affix, ScannedIndex = i, Status = status, Explanation = explanation });
+            }
+
+            string name = snapshot.UniqueName.Length > 0 ? snapshot.UniqueName : "This unique";
+            var uniques = build?.Uniques ?? Array.Empty<BuildUnique>();
+            bool recognised = snapshot.UniqueId.Length > 0;
+            bool inBuild = recognised && uniques.Any(u => string.Equals(u.Id, snapshot.UniqueId, StringComparison.OrdinalIgnoreCase));
+            int scannedCount = comparisons.Count(c => c.Scanned != null);
+
+            string headline;
+            string summary;
+            if (!recognised)
+            {
+                headline = "Unique item";
+                summary = "The scanner couldn't tell which unique this is, so it can't check it against your build.";
+            }
+            else if (inBuild)
+            {
+                headline = $"{name} is in your build";
+                summary = "The advisor doesn't suggest crafting steps for uniques yet. The rows show which of its affixes your build also lists for this slot.";
+            }
+            else if (uniques.Count > 0)
+            {
+                headline = $"{name} isn't in your build";
+                summary = $"Your build uses {JoinNames(uniques.Select(u => u.Name.Length > 0 ? u.Name : "an unrecognised unique").Distinct().ToList())}.";
+            }
+            else
+            {
+                headline = $"{name} isn't in your build";
+                summary = "Your selected build doesn't list any unique items.";
+            }
+
+            return new CraftingAnalysis
+            {
+                Verdict = CraftingVerdict.NotApplicable,
+                Comparisons = comparisons,
+                TargetCount = targets.Count,
+                MatchCount = matches,
+                BuildMatchStatement = scannedCount == 0 ? string.Empty : $"{matches} of this unique's {scannedCount} affixes are in your build for this slot.",
+                Recommendation = new CraftingRecommendation
+                {
+                    Kind = RecommendationKind.NoAdvice,
+                    Headline = headline,
+                    Summary = summary,
+                    Keep = inBuild ? comparisons.Where(c => c.Status == AffixStatus.Match).Select(c => c.Name).ToList() : Array.Empty<string>()
+                }
             };
         }
 

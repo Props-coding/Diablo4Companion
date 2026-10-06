@@ -54,6 +54,8 @@ namespace D4Companion.Crafting
                 ItemType = Clean(snapshot.ItemType).ToLowerInvariant(),
                 Rarity = Clean(snapshot.Rarity),
                 Note = Clean(snapshot.Note),
+                UniqueId = Clean(snapshot.UniqueId),
+                UniqueName = Clean(snapshot.UniqueName),
                 CraftState = (snapshot.CraftState ?? new ItemCraftState()) with
                 {
                     EnchantedAffixId = snapshot.CraftState?.EnchantedAffixId == null ? null : Clean(snapshot.CraftState.EnchantedAffixId, MaxIdLength),
