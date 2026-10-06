@@ -1,0 +1,173 @@
+<UserControl x:Class="D4Companion.Views.Dialogs.QuickImportView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:dialogs="clr-namespace:D4Companion.ViewModels.Dialogs"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type=dialogs:QuickImportViewModel}"
+             d:DesignWidth="720">
+
+    <!-- Paste a link, pick a version, name it. The original tabbed dialog stays under "Other options". -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <Style x:Key="QuickImport.TextBox" TargetType="TextBox">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Text}" />
+            <Setter Property="Background" Value="{StaticResource Companion.Brush.Obsidian}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Border}" />
+            <Setter Property="CaretBrush" Value="{StaticResource Companion.Brush.Text}" />
+        </Style>
+
+        <Style x:Key="QuickImport.StepNumber" TargetType="Border">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="CornerRadius" Value="11" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
+        <DataTemplate x:Key="QuickImport.SiteChip" DataType="{x:Type dialogs:QuickImportSiteViewModel}">
+            <Border x:Name="Chip" CornerRadius="12" Padding="10,3" Margin="0,0,6,6" BorderThickness="1"
+                    Background="{StaticResource Companion.Brush.SurfaceRaised}" BorderBrush="{StaticResource Companion.Brush.Border}">
+                <TextBlock x:Name="ChipText" Text="{Binding Name}" FontSize="12" Foreground="{StaticResource Companion.Brush.TextMuted}" />
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsDetected}" Value="True">
+                    <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+                    <Setter TargetName="Chip" Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+                    <Setter TargetName="ChipText" Property="Foreground" Value="{StaticResource Companion.Brush.Gold}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Border Background="{StaticResource Companion.Brush.Surface}" BorderBrush="{StaticResource Companion.Brush.Border}"
+            BorderThickness="1" CornerRadius="8" Padding="22" Width="680">
+        <StackPanel>
+            <TextBlock Text="IMPORT A BUILD" Style="{StaticResource Companion.Text.Eyebrow}" />
+            <TextBlock Text="Bring in a build from a guide site" Style="{StaticResource Companion.Text.Headline}" Margin="0,4,0,18" />
+
+            <!-- Step 1 -->
+            <StackPanel Orientation="Horizontal">
+                <Border Style="{StaticResource QuickImport.StepNumber}">
+                    <TextBlock Text="1" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Gold}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="Paste the build link" Style="{StaticResource Companion.Text.CardTitle}" VerticalAlignment="Center" />
+            </StackPanel>
+            <Grid Margin="32,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="LinkBox" Style="{StaticResource QuickImport.TextBox}"
+                         Text="{Binding Link, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding FetchCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+                <Button Grid.Column="1" Content="Fetch build" Margin="8,0,0,0" Style="{StaticResource Companion.Button.Primary}"
+                        Command="{Binding FetchCommand}" />
+            </Grid>
+            <ItemsControl Margin="32,10,0,0" ItemsSource="{Binding Sites}" ItemTemplate="{StaticResource QuickImport.SiteChip}"
+                          ItemsPanel="{StaticResource Companion.WrapPanel}" Focusable="False" />
+
+            <Border Style="{StaticResource Companion.Callout.Warning}" Margin="32,4,0,0"
+                    Visibility="{Binding HasLinkProblem, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding LinkProblem}" Style="{StaticResource Companion.Text}" FontSize="13" />
+            </Border>
+            <Border Style="{StaticResource Companion.Callout.Info}" Margin="32,4,0,0"
+                    Visibility="{Binding IsFetching, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,0,0,8" Foreground="{StaticResource Companion.Brush.Gold}" Background="Transparent" BorderThickness="0" />
+                    <TextBlock Text="{Binding Status}" Style="{StaticResource Companion.Text.Muted}" />
+                    <TextBlock Text="Some sites open a hidden browser window to read the build. This can take a minute."
+                               Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Companion.Callout.Warning}" Margin="32,4,0,0"
+                    Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding Error}" Style="{StaticResource Companion.Text}" FontSize="13" />
+            </Border>
+
+            <!-- Step 2 -->
+            <StackPanel Visibility="{Binding HasBuild, Converter={StaticResource BoolToVisibility}}" Margin="0,18,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource QuickImport.StepNumber}">
+                        <TextBlock Text="2" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Gold}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Pick a version" Style="{StaticResource Companion.Text.CardTitle}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Margin="32,4,0,0" Style="{StaticResource Companion.Text.Muted}">
+                    <Run Text="Found " /><Run Text="{Binding BuildTitle, Mode=OneWay}" FontWeight="SemiBold" />
+                </TextBlock>
+                <ScrollViewer Margin="32,8,0,0" MaxHeight="190" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Versions}" ItemsPanel="{StaticResource Companion.WrapPanel}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type dialogs:QuickImportVersionViewModel}">
+                                <Button x:Name="Card" Width="196" Margin="0,0,8,8" Padding="12,10" HorizontalContentAlignment="Left"
+                                        Style="{StaticResource Companion.Button.Secondary}"
+                                        Command="{Binding DataContext.SelectVersionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                        <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+                                        <Setter TargetName="Card" Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+
+            <!-- Step 3 -->
+            <StackPanel Visibility="{Binding HasVersion, Converter={StaticResource BoolToVisibility}}" Margin="0,14,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <Border Style="{StaticResource QuickImport.StepNumber}">
+                        <TextBlock Text="3" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Gold}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Name it" Style="{StaticResource Companion.Text.CardTitle}" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBox Margin="32,10,0,0" Style="{StaticResource QuickImport.TextBox}"
+                         Text="{Binding PresetName, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Margin="32,6,0,0" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Foreground="{StaticResource Companion.Brush.Warning}"
+                           Text="You already have a build with this name. Adding will replace it."
+                           Visibility="{Binding NameExists, Converter={StaticResource BoolToVisibility}}" />
+                <CheckBox Margin="32,10,0,0" IsChecked="{Binding MakeActive}">
+                    <TextBlock Text="Make it my active build" Style="{StaticResource Companion.Text}" />
+                </CheckBox>
+            </StackPanel>
+
+            <!-- Footer -->
+            <Border Style="{StaticResource Companion.GoldRule}" Margin="0,20,0,14" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Click="OtherOptions_Click"
+                        ToolTip="Opens the full import window: import from a file, merge two builds, or manage downloaded builds.">
+                    <TextBlock Text="Other options: import a file, merge two builds" FontSize="13" />
+                </Button>
+                <Button Grid.Column="1" Content="Cancel" Margin="0,0,8,0" Style="{StaticResource Companion.Button.Secondary}"
+                        IsCancel="True" Click="Cancel_Click" />
+                <Button Grid.Column="2" Content="Add build" Style="{StaticResource Companion.Button.Primary}"
+                        Command="{Binding AddCommand}" IsDefault="{Binding HasVersion}" />
+            </Grid>
+        </StackPanel>
+    </Border>
+</UserControl>

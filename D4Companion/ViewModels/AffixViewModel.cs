@@ -11,6 +11,7 @@ using D4Companion.ViewModels.Dialogs;
 using D4Companion.ViewModels.Entities;
 using D4Companion.Views.Dialogs;
 using MahApps.Metro.Controls.Dialogs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.ObjectModel;
@@ -98,6 +99,7 @@ namespace D4Companion.ViewModels
             AspectConfigCommand = new RelayCommand(AspectConfigExecute);
             RemoveAffixPresetNameCommand = new RelayCommand(RemoveAffixPresetNameExecute, CanRemoveAffixPresetNameExecute);
             ImportAffixPresetCommand = new RelayCommand(ImportAffixPresetCommandExecute, CanImportAffixPresetCommandExecute);
+            QuickImportCommand = new RelayCommand(QuickImportExecute);
             EditAffixCommand = new RelayCommand<ItemAffix>(EditAffixExecute);
             RenameAffixPresetCommand = new RelayCommand(RenameAffixPresetCommandExecute, CanRenameAffixPresetCommandExecute);
             RemoveAffixCommand = new RelayCommand<ItemAffix>(RemoveAffixExecute);
@@ -203,6 +205,7 @@ namespace D4Companion.ViewModels
         public ICommand EditAffixCommand { get; }
         public ICommand RemoveAffixPresetNameCommand { get; }
         public ICommand ImportAffixPresetCommand { get; }
+        public ICommand QuickImportCommand { get; }
         public ICommand RenameAffixPresetCommand { get; }
         public ICommand RemoveAffixCommand { get; }
         public ICommand RemoveAspectCommand { get; }
@@ -1794,6 +1797,22 @@ namespace D4Companion.ViewModels
         private bool CanImportAffixPresetCommandExecute()
         {
             return true;
+        }
+
+        private async void QuickImportExecute()
+        {
+            var services = App.Current.Services;
+            var dialog = new CustomDialog() { Title = string.Empty };
+            using var dataContext = new QuickImportViewModel(_affixManager, _buildsManagerD2Core, _buildsManagerD4Builds,
+                _buildsManagerInfinityBuilds, _buildsManagerMaxroll, _buildsManagerMobalytics,
+                services.GetRequiredService<D4Companion.State.CompanionState>(),
+                services.GetRequiredService<ILogger<QuickImportViewModel>>());
+            var view = new QuickImportView() { DataContext = dataContext };
+            dialog.Content = view;
+            await _dialogCoordinator.ShowMetroDialogAsync(this, dialog);
+            await dialog.WaitUntilUnloadedAsync();
+
+            if (view.OtherOptionsRequested) ImportAffixPresetCommandExecute();
         }
 
         private async void ImportAffixPresetCommandExecute()

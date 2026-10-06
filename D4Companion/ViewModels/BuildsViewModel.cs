@@ -94,7 +94,7 @@ namespace D4Companion.ViewModels
 
             ClassOptions = new[] { "All classes" }.Concat(ClassIndexes.Select(c => c.Name)).ToList();
 
-            ImportCommand = new RelayCommand(() => _editor.ImportAffixPresetCommand.Execute(null));
+            ImportCommand = new RelayCommand(() => _editor.QuickImportCommand.Execute(null));
             SelectBuildCommand = new RelayCommand<BuildCardViewModel>(card => { if (card != null) _state.SelectPreset(card.Name); });
             SelectSlotCommand = new RelayCommand<BuildSlotViewModel>(SelectSlot);
             RemoveAffixCommand = new RelayCommand<BuildAffixRowViewModel>(RemoveAffix);
