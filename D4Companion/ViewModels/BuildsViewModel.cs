@@ -39,14 +39,14 @@ namespace D4Companion.ViewModels
 
     public sealed class BuildAffixRowViewModel
     {
-        public ItemAffix Model { get; init; } = new();
+        /// <summary>Every identical copy of this line in the preset. Imports sometimes list the same line twice.</summary>
+        public IReadOnlyList<ItemAffix> Copies { get; init; } = Array.Empty<ItemAffix>();
         public string Name { get; init; } = string.Empty;
         public IReadOnlyList<string> Tags { get; init; } = Array.Empty<string>();
         public IReadOnlyList<PrismChip> Prisms { get; init; } = Array.Empty<PrismChip>();
         public bool HasPrisms => Prisms.Count > 0;
-        public string Note { get; init; } = string.Empty;
-        public bool HasNote => Note.Length > 0;
-        public bool IsDuplicate { get; init; }
+        public bool IsMerged => Copies.Count > 1;
+        public string MergedText => IsMerged ? $"Merged {Copies.Count} identical copies from the import" : string.Empty;
     }
 
     public sealed class AffixSearchResultViewModel
@@ -120,6 +120,12 @@ namespace D4Companion.ViewModels
         /// </summary>
         public AffixViewModel Editor => _editor;
 
+        /// <summary>
+        /// True when the slot asks for the same stat in two forms, for example regular and tempered.
+        /// Explained once under the list instead of on every row.
+        /// </summary>
+        public bool HasRepeatedStat { get; private set; }
+
         public ObservableCollection<BuildCardViewModel> Builds { get; } = new();
         public bool HasBuilds => Builds.Count > 0;
         public bool HasActiveBuild => Builds.Any(b => b.IsActive);
@@ -182,7 +188,7 @@ namespace D4Companion.ViewModels
         private void RemoveAffix(BuildAffixRowViewModel? row)
         {
             if (row == null) return;
-            _affixManager.RemoveAffix(row.Model);
+            foreach (var copy in row.Copies.ToList()) _affixManager.RemoveAffix(copy);
         }
 
         private void AddAffix(AffixSearchResultViewModel? result)
@@ -200,10 +206,11 @@ namespace D4Companion.ViewModels
             foreach (var preset in _affixManager.AffixPresets)
             {
                 int slots = preset.ItemAffixes.Select(a => a.Type).Distinct().Count();
+                int lines = UniqueLines(preset.ItemAffixes).Count();
                 Builds.Add(new BuildCardViewModel
                 {
                     Name = preset.Name,
-                    Summary = preset.ItemAffixes.Count == 0 ? "No affixes yet" : $"{preset.ItemAffixes.Count} affixes across {slots} slots",
+                    Summary = lines == 0 ? "No affixes yet" : $"{lines} affixes across {slots} slots",
                     IsActive = preset.Name.Equals(_state.SelectedPresetName)
                 });
             }
@@ -211,7 +218,7 @@ namespace D4Companion.ViewModels
             var affixes = ActivePreset?.ItemAffixes ?? new List<ItemAffix>();
             foreach (var slot in Slots)
             {
-                slot.Count = affixes.Count(a => a.Type.Equals(slot.Id, StringComparison.OrdinalIgnoreCase));
+                slot.Count = UniqueLines(affixes.Where(a => a.Type.Equals(slot.Id, StringComparison.OrdinalIgnoreCase))).Count();
                 slot.Refresh();
             }
 
@@ -231,35 +238,40 @@ namespace D4Companion.ViewModels
                     .Where(a => a.Type.Equals(_selectedSlot, StringComparison.OrdinalIgnoreCase))
                     .ToList();
 
-                var seen = new HashSet<(string, bool, bool, bool)>();
-                foreach (var affix in inSlot)
+                // Identical lines (same stat, type and requirements) are shown once.
+                // Different forms of the same stat, such as regular and tempered, stay separate.
+                var groups = inSlot
+                    .GroupBy(a => (Id: a.Id.ToLowerInvariant(), a.IsImplicit, a.IsTempered, a.IsGreater))
+                    .ToList();
+                foreach (var group in groups)
                 {
-                    var key = (affix.Id.ToLowerInvariant(), affix.IsImplicit, affix.IsTempered, affix.IsGreater);
-                    bool isDuplicate = !seen.Add(key);
-                    bool hasOtherForm = inSlot.Any(o => !ReferenceEquals(o, affix) && o.Id.Equals(affix.Id, StringComparison.OrdinalIgnoreCase) &&
-                        (o.IsImplicit != affix.IsImplicit || o.IsTempered != affix.IsTempered));
-
-                    string note = isDuplicate
-                        ? "Listed twice, probably from the import. It is only counted once. You can remove this copy."
-                        : hasOtherForm
-                            ? "This build wants this stat more than once on this slot, for example as a regular and a tempered affix. Each is checked separately."
-                            : string.Empty;
-
-                    string name = _state.GetAffixName(affix.Id);
+                    var first = group.First();
+                    string name = _state.GetAffixName(first.Id);
                     SlotAffixes.Add(new BuildAffixRowViewModel
                     {
-                        Model = affix,
+                        Copies = group.ToList(),
                         Name = string.IsNullOrWhiteSpace(name) ? "Unknown affix" : name,
-                        Tags = Tags(affix),
-                        Prisms = PrismChip.From(_state.GetPrisms(affix.Id)),
-                        Note = note,
-                        IsDuplicate = isDuplicate
+                        Tags = Tags(first),
+                        Prisms = PrismChip.From(_state.GetPrisms(first.Id))
                     });
                 }
+
+                HasRepeatedStat = groups
+                    .GroupBy(g => g.Key.Id)
+                    .Any(g => g.Count() > 1);
+            }
+            else
+            {
+                HasRepeatedStat = false;
             }
 
+            OnPropertyChanged(nameof(HasRepeatedStat));
             OnPropertyChanged(nameof(HasSlotAffixes));
         }
+
+        // Identical copies from an import count as one line.
+        private static IEnumerable<(string, string, bool, bool, bool)> UniqueLines(IEnumerable<ItemAffix> affixes) =>
+            affixes.Select(a => (a.Id.ToLowerInvariant(), a.Type.ToLowerInvariant(), a.IsImplicit, a.IsTempered, a.IsGreater)).Distinct();
 
         private static IReadOnlyList<string> Tags(ItemAffix affix)
         {

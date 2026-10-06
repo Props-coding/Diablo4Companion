@@ -35,6 +35,7 @@ namespace D4Companion.ViewModels.Entities
         private readonly Func<string, IReadOnlyList<string>> _prismLookup;
         private readonly Func<string, bool> _percentLookup;
         private bool _isOffTarget;
+        private bool _isProtected;
         private string _affixId;
         private string _valueText;
         private AffixKind _kind;
@@ -225,6 +226,15 @@ namespace D4Companion.ViewModels.Entities
             {
                 if (SetProperty(ref _isOffTarget, value)) OnPropertyChanged(nameof(StatusText));
             }
+        }
+
+        /// <summary>
+        /// Not in the build, but kept out of suggestions because it is a greater affix.
+        /// </summary>
+        public bool IsProtected
+        {
+            get => _isProtected;
+            set => SetProperty(ref _isProtected, value);
         }
 
         public bool HasPrisms => _prismLookup(_affixId).Count > 0;

@@ -4,13 +4,14 @@ namespace D4Companion.Crafting.Tests
 {
     public class CraftingAnalyzerTests
     {
-        private static ScannedAffix Affix(string id, AffixKind kind = AffixKind.Normal, double? value = 10, bool keep = false) => new()
+        private static ScannedAffix Affix(string id, AffixKind kind = AffixKind.Normal, double? value = 10, bool keep = false, params string[] prisms) => new()
         {
             AffixId = id,
             DisplayName = id,
             Kind = kind,
             Value = value,
-            IsKeep = keep
+            IsKeep = keep,
+            TuningPrisms = prisms
         };
 
         private static TargetAffix Target(string id, bool greater = false, bool tempered = false, bool isImplicit = false, double? minimum = null, params string[] prisms) => new()
@@ -160,9 +161,9 @@ namespace D4Companion.Crafting.Tests
         [Test]
         public void ProtectedAffix_IsNeverSuggestedForReplacement()
         {
-            var item = Ring(Affix("CritChance"), Affix("DamageOverTime", keep: true));
+            var item = Ring(Affix("CritChance"), Affix("Life"), Affix("Armor"), Affix("DamageOverTime", keep: true));
 
-            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("AttackSpeed")));
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("Life"), Target("Armor"), Target("AttackSpeed")));
 
             Assert.That(result.Recommendation.ReplaceCandidate, Is.Null);
             Assert.That(result.Recommendation.Keep, Does.Contain("DamageOverTime"));
@@ -182,14 +183,16 @@ namespace D4Companion.Crafting.Tests
         [Test]
         public void GreaterOffTargetAffix_IsProtectedByDefault()
         {
-            var item = Ring(Affix("Willpower", AffixKind.Greater), Affix("CritChance"));
+            var item = Ring(Affix("Willpower", AffixKind.Greater), Affix("CritChance"), Affix("Life"), Affix("Armor"));
 
-            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("AttackSpeed")));
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("Life"), Target("Armor"), Target("AttackSpeed")));
 
             Assert.That(result.Recommendation.ReplaceCandidate, Is.Null);
+            Assert.That(result.Recommendation.Instruction, Is.Null);
             Assert.That(result.Recommendation.Protected, Is.EqualTo(new[] { "Willpower" }));
-            Assert.That(result.Recommendation.Headline, Is.EqualTo("No safe reroll"));
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Replacement candidates are protected"));
             Assert.That(result.Recommendation.TargetStat, Is.EqualTo("AttackSpeed"));
+            Assert.That(result.Comparisons.Single(c => c.Scanned?.AffixId == "Willpower").IsProtected, Is.True);
         }
 
         [Test]
@@ -201,7 +204,8 @@ namespace D4Companion.Crafting.Tests
                 new AdvisorOptions { IncludeGreaterAffixes = true });
 
             Assert.That(result.Recommendation.ReplaceCandidate?.AffixId, Is.EqualTo("Willpower"));
-            Assert.That(result.Recommendation.Headline, Is.EqualTo("Reroll Willpower"));
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Enchant Willpower"));
+            Assert.That(result.Comparisons.Single(c => c.Scanned?.AffixId == "Willpower").IsProtected, Is.False);
             Assert.That(result.Recommendation.ReplaceCandidateNote, Does.Contain("greater"));
         }
 
@@ -248,12 +252,12 @@ namespace D4Companion.Crafting.Tests
         }
 
         [Test]
-        public void TemperedTarget_AcceptsTemperedOrGreaterAffix()
+        public void TemperedTarget_NeedsATemperedAffix()
         {
             Assert.That(CraftingAnalyzer.Analyze(Ring(Affix("Thorns", AffixKind.Tempered)), Build(Target("Thorns", tempered: true))).Verdict,
                 Is.EqualTo(CraftingVerdict.MeetsTarget));
-            Assert.That(CraftingAnalyzer.Analyze(Ring(Affix("Thorns", AffixKind.Greater)), Build(Target("Thorns", tempered: true))).Verdict,
-                Is.EqualTo(CraftingVerdict.MeetsTarget));
+            Assert.That(CraftingAnalyzer.Analyze(Ring(Affix("Thorns", AffixKind.Greater)), Build(Target("Thorns", tempered: true))).Comparisons.Single().Status,
+                Is.EqualTo(AffixStatus.Review));
             Assert.That(CraftingAnalyzer.Analyze(Ring(Affix("Thorns", AffixKind.Normal)), Build(Target("Thorns", tempered: true))).Comparisons.Single().Status,
                 Is.EqualTo(AffixStatus.Review));
         }
@@ -302,6 +306,122 @@ namespace D4Companion.Crafting.Tests
             targets.Add(Target("AttackSpeed"));
 
             Assert.That(build.Affixes.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void OneAffix_NeverCoversTwoBuildLines()
+        {
+            // Build wants Maximum Life as a regular and as a tempered affix. The item has one greater Maximum Life.
+            var item = Ring(Affix("Life", AffixKind.Greater), Affix("CritChance"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("Life"), Target("Life", tempered: true), Target("CritChance")));
+
+            var lifeRows = result.Comparisons.Where(c => c.Target?.AffixId == "Life").ToList();
+            Assert.That(lifeRows.Single(c => !c.Target!.IsTempered).Status, Is.EqualTo(AffixStatus.Match));
+            Assert.That(lifeRows.Single(c => c.Target!.IsTempered).Status, Is.EqualTo(AffixStatus.Missing));
+            Assert.That(result.Recommendation.MissingTargets, Does.Contain("Life (tempered)"));
+            Assert.That(result.MatchCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void RegularAndTemperedCopies_EachFindTheirOwnAffix()
+        {
+            var item = Ring(Affix("Life", AffixKind.Tempered), Affix("Life", AffixKind.Greater));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("Life", tempered: true), Target("Life")));
+
+            Assert.That(result.Verdict, Is.EqualTo(CraftingVerdict.MeetsTarget));
+        }
+
+        [Test]
+        public void SharedPrismGroup_SuggestsFocusedRerollWithThatPrism()
+        {
+            var item = Ring(Affix("Thorns", prisms: "TuningStone_2"), Affix("CritChance", prisms: "TuningStone_1"),
+                Affix("Willpower", prisms: "TuningStone_6"), Affix("Life", prisms: "TuningStone_2X"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("Willpower"), Target("Life"),
+                Target("Armor", prisms: "TuningStone_2")));
+
+            var step = result.Recommendation.Instruction!;
+            Assert.That(step.Station, Is.EqualTo("Horadric Cube"));
+            Assert.That(step.Operation, Is.EqualTo("Focused Reroll"));
+            Assert.That(step.PrismId, Is.EqualTo("TuningStone_2"));
+            Assert.That(step.AffectedAffix, Is.EqualTo("Thorns"));
+            Assert.That(step.DesiredAffix, Is.EqualTo("Armor"));
+            Assert.That(step.Line, Is.EqualTo("Horadric Cube: Focused Reroll on Thorns with Protector's Tuning Prism"));
+        }
+
+        [Test]
+        public void SharedPrismGroupWithOtherAffixes_SuggestsEnchantAndNamesTheRisk()
+        {
+            var item = Ring(Affix("Thorns", prisms: "TuningStone_2"), Affix("Life", prisms: "TuningStone_2"),
+                Affix("CritChance", prisms: "TuningStone_1"), Affix("Willpower", prisms: "TuningStone_6"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("Life"), Target("CritChance"), Target("Willpower"),
+                Target("Armor", prisms: "TuningStone_2")));
+
+            var step = result.Recommendation.Instruction!;
+            Assert.That(step.Station, Is.EqualTo("Occultist"));
+            Assert.That(step.Operation, Is.EqualTo("Enchant"));
+            Assert.That(step.AffectedAffix, Is.EqualTo("Thorns"));
+            Assert.That(step.Reason, Does.Contain("Life"));
+        }
+
+        [Test]
+        public void FreeAffixSlot_SuggestsAddAnAffixWithTheGoalPrism()
+        {
+            var item = Ring(Affix("CritChance"), Affix("Life"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("Life"), Target("AttackSpeed", prisms: "TuningStone_1")));
+
+            var step = result.Recommendation.Instruction!;
+            Assert.That(step.Operation, Is.EqualTo("Add an Affix"));
+            Assert.That(step.PrismId, Is.EqualTo("TuningStone_1"));
+            Assert.That(step.Caveat, Does.Contain("not guaranteed"));
+        }
+
+        [Test]
+        public void OnlyTemperedMissing_SuggestsTempering()
+        {
+            var item = Ring(Affix("CritChance"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("Life", tempered: true)));
+
+            Assert.That(result.Recommendation.Instruction?.Operation, Is.EqualTo("Temper"));
+            Assert.That(result.Recommendation.Instruction?.Station, Is.EqualTo("Blacksmith"));
+        }
+
+        [Test]
+        public void BelowMinimum_SuggestsMasterworking()
+        {
+            var item = Ring(Affix("CritChance", value: 3));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance", minimum: 5)));
+
+            Assert.That(result.Recommendation.Instruction?.Operation, Is.EqualTo("Masterwork"));
+        }
+
+        [Test]
+        public void GreaterNeeded_HasNoCraftingStep()
+        {
+            var item = Ring(Affix("CritChance"));
+
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance", greater: true)));
+
+            Assert.That(result.Recommendation.Instruction, Is.Null);
+            Assert.That(result.Recommendation.Summary, Does.Contain("cannot make an existing affix greater"));
+        }
+
+        [Test]
+        public void Instructions_NeverPromiseOddsOrCosts()
+        {
+            var item = Ring(Affix("Thorns", prisms: "TuningStone_2"), Affix("CritChance"));
+            var result = CraftingAnalyzer.Analyze(item, Build(Target("CritChance"), Target("Armor", prisms: "TuningStone_2")));
+
+            string text = string.Join(" ", result.Recommendation.Instruction!.Reason, result.Recommendation.Instruction.Caveat, result.Recommendation.Summary);
+            Assert.That(text, Does.Not.Contain("%"));
+            Assert.That(text, Does.Not.Contain("chance").IgnoreCase);
+            Assert.That(text, Does.Not.Contain("gold").IgnoreCase);
         }
     }
 }

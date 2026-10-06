@@ -194,18 +194,8 @@
                                                     <ItemsControl ItemsSource="{Binding Prisms}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
                                                                   ItemsPanel="{StaticResource Companion.WrapPanel}"
                                                                   Visibility="{Binding HasPrisms, Converter={StaticResource BoolToVisibility}}" />
-                                                    <TextBlock Text="{Binding Note}" FontSize="12" Margin="0,4,0,0"
-                                                               Visibility="{Binding HasNote, Converter={StaticResource BoolToVisibility}}">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Companion.Text.Muted}">
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IsDuplicate}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{StaticResource Companion.Brush.Warning}" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding MergedText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,4,0,0"
+                                                               Visibility="{Binding IsMerged, Converter={StaticResource BoolToVisibility}}" />
                                                 </StackPanel>
                                                 <Button Grid.Column="1" Content="Remove" Style="{StaticResource Companion.Button.Link}" Foreground="{StaticResource Companion.Brush.TextMuted}"
                                                         VerticalAlignment="Top"
@@ -217,8 +207,11 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
+                            <TextBlock Text="Some stats are listed with two types, for example regular and tempered. Each needs its own affix on the item."
+                                       Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,10,0,0"
+                                       Visibility="{Binding HasRepeatedStat, Converter={StaticResource BoolToVisibility}}" />
                             <TextBlock Text="To require a greater affix or a minimum value, use the Advanced editor."
-                                       Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,10,0,0" />
+                                       Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,6,0,0" />
                         </StackPanel>
                     </Border>
 

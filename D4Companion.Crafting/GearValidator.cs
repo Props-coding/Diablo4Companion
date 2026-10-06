@@ -115,7 +115,7 @@ namespace D4Companion.Crafting
             var duplicates = affixes
                 .Select((a, i) => (Affix: a, Index: i))
                 .Where(x => !string.IsNullOrWhiteSpace(x.Affix.AffixId))
-                .GroupBy(x => (Id: x.Affix.AffixId.ToLowerInvariant(), Implicit: x.Affix.Kind == AffixKind.Implicit))
+                .GroupBy(x => (Id: x.Affix.AffixId.ToLowerInvariant(), Implicit: x.Affix.Kind == AffixKind.Implicit, Tempered: x.Affix.Kind == AffixKind.Tempered))
                 .Where(g => g.Count() > 1);
             foreach (var group in duplicates)
             {

@@ -294,7 +294,7 @@ namespace D4Companion.ViewModels
         }
 
         public string ConfirmationText => IsConfirmed
-            ? "Confirmed. If you change anything you will need to confirm again."
+            ? "Changing anything will need a new confirmation."
             : "Does this match the game? If something is wrong, use Edit scan to fix it.";
 
         public string ConfirmButtonText => IsConfirmed ? "Confirmed" : "Looks right, confirm";
@@ -344,7 +344,9 @@ namespace D4Companion.ViewModels
             else
             {
                 NextActionTitle = Headline;
-                NextActionDetail = HasTargetStat ? $"Target: {TargetStat}" : Summary;
+                NextActionDetail = Instruction is CraftingInstruction step
+                    ? (step.DesiredAffix.Length > 0 ? $"{step.Line}. Aim for {step.DesiredAffix}." : step.Line + ".")
+                    : HasTargetStat ? $"Target: {TargetStat}" : Summary;
                 ShowSaveAction = HasUnsavedChanges;
                 ShowRescanAction = !HasUnsavedChanges && _currentRecordId != null;
             }
@@ -368,6 +370,25 @@ namespace D4Companion.ViewModels
             ?? "Capture a scan, check the values, and confirm. The advisor only gives a recommendation for a confirmed item.";
         public string TargetStat => _analysis?.Recommendation.TargetStat ?? string.Empty;
         public bool HasTargetStat => ShowRecommendation && !string.IsNullOrEmpty(TargetStat);
+        // The concrete crafting step, when one can be named.
+        private CraftingInstruction? Instruction => ShowRecommendation ? _analysis?.Recommendation.Instruction : null;
+        public bool HasInstruction => Instruction != null;
+        /// <summary>The "Aim for" tag at the top, hidden when the step card already names the target.</summary>
+        public bool ShowTargetTag => HasTargetStat && !HasInstruction;
+        public string InstructionStation => Instruction?.Station ?? string.Empty;
+        public string InstructionOperation => Instruction?.Operation ?? string.Empty;
+        public string InstructionAffected => Instruction?.AffectedAffix ?? string.Empty;
+        public bool HasInstructionAffected => InstructionAffected.Length > 0;
+        public string InstructionDesired => Instruction?.DesiredAffix ?? string.Empty;
+        public bool HasInstructionDesired => InstructionDesired.Length > 0;
+        public IReadOnlyList<PrismChip> InstructionPrism => Instruction is { PrismId.Length: > 0 } step
+            ? PrismChip.From(new[] { step.PrismId })
+            : Array.Empty<PrismChip>();
+        public bool HasInstructionPrism => InstructionPrism.Count > 0;
+        public string InstructionReason => Instruction?.Reason ?? string.Empty;
+        public string InstructionCaveat => Instruction?.Caveat ?? string.Empty;
+        public bool HasInstructionCaveat => InstructionCaveat.Length > 0;
+
         public string ProtectedText => Join(_analysis?.Recommendation.Protected);
         public bool HasProtected => !string.IsNullOrEmpty(ProtectedText);
 
@@ -470,7 +491,8 @@ namespace D4Companion.ViewModels
             }
 
             IsConfirmed = true;
-            StatusMessage = "Item confirmed.";
+            // The "Confirmed" badge already says this. No second message.
+            StatusMessage = string.Empty;
             Analyze();
         }
 
@@ -687,6 +709,7 @@ namespace D4Companion.ViewModels
             {
                 row.Status = null;
                 row.IsOffTarget = false;
+                row.IsProtected = false;
                 row.Explanation = string.Empty;
             }
 
@@ -714,6 +737,7 @@ namespace D4Companion.ViewModels
                         {
                             Affixes[index].Status = comparison.Status;
                             Affixes[index].IsOffTarget = comparison.IsOffTarget;
+                            Affixes[index].IsProtected = comparison.IsProtected;
                             Affixes[index].Explanation = comparison.Explanation;
                         }
                     }
@@ -758,6 +782,13 @@ namespace D4Companion.ViewModels
             OnPropertyChanged(nameof(ProtectedText));
             OnPropertyChanged(nameof(HasProtected));
             OnPropertyChanged(nameof(HasDetails));
+            foreach (var name in new[] { nameof(HasInstruction), nameof(ShowTargetTag), nameof(InstructionStation), nameof(InstructionOperation),
+                         nameof(InstructionAffected), nameof(HasInstructionAffected), nameof(InstructionDesired), nameof(HasInstructionDesired),
+                         nameof(InstructionPrism), nameof(HasInstructionPrism), nameof(InstructionReason),
+                         nameof(InstructionCaveat), nameof(HasInstructionCaveat) })
+            {
+                OnPropertyChanged(name);
+            }
             RefreshNextAction();
         }
 
