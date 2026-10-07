@@ -16,5 +16,10 @@ namespace D4Companion.Entities
         public bool IsImplicit { get; set; } = false;
         public bool IsTempered { get; set; } = false;
         public List<string> TuningPrisms { get; set; } = new List<string>();
+        /// <summary>
+        /// Which of two same-type slots this belongs to, for example "Ring 1" or "Ring 2". Empty when the import
+        /// doesn't say. Lets the Crafting Advisor compare each ring with its own half of the build.
+        /// </summary>
+        public string Variant { get; set; } = string.Empty;
     }
 }

@@ -112,6 +112,8 @@ namespace D4Companion.Crafting
     /// </summary>
     public sealed record TargetAffix
     {
+        /// <summary>"Ring 1" or "Ring 2" when the build has two of this slot; empty otherwise.</summary>
+        public string Variant { get; init; } = string.Empty;
         public string AffixId { get; init; } = string.Empty;
         public string DisplayName { get; init; } = string.Empty;
         public string ItemType { get; init; } = string.Empty;
@@ -132,7 +134,8 @@ namespace D4Companion.Crafting
     /// <summary>
     /// A frozen copy of the selected build (affix preset).
     /// </summary>
-    public sealed record BuildUnique(string Id, string Name);
+    /// <summary>A unique the build uses. Variant says which slot it's for ("Ring 1"), when the import says.</summary>
+    public sealed record BuildUnique(string Id, string Name, string Variant = "");
 
     public sealed record BuildTarget
     {
@@ -140,6 +143,17 @@ namespace D4Companion.Crafting
         public IReadOnlyList<TargetAffix> Affixes { get; init; } = Array.Empty<TargetAffix>();
         /// <summary>Unique items the build uses. Imports don't say which slot each one is for.</summary>
         public IReadOnlyList<BuildUnique> Uniques { get; init; } = Array.Empty<BuildUnique>();
+
+        /// <summary>The slot variants for an item type, for example "Ring 1" and "Ring 2". Empty when the build has none.</summary>
+        public IReadOnlyList<string> VariantsFor(string itemType) =>
+            ForItemType(itemType).Select(a => a.Variant).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        /// <summary>A copy of the build where this item type keeps only one variant's affixes.</summary>
+        public BuildTarget WithVariant(string itemType, string variant) => this with
+        {
+            Affixes = Affixes.Where(a => !string.Equals(a.ItemType, itemType, StringComparison.OrdinalIgnoreCase)
+                                         || string.Equals(a.Variant, variant, StringComparison.OrdinalIgnoreCase)).ToList()
+        };
 
         public IReadOnlyList<TargetAffix> ForItemType(string itemType)
         {

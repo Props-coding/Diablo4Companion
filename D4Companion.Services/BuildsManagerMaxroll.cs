@@ -85,6 +85,9 @@ namespace D4Companion.Services
                 // Loop through all items
                 foreach (var item in maxrollBuildDataProfileJson.Items)
                 {
+                    // The two rings are kept apart, so each can be compared with its own affixes.
+                    string variant = item.Key switch { 16 => "Ring 1", 17 => "Ring 2", _ => string.Empty };
+
                     switch (item.Key)
                     {
                         case 4: // Helm
@@ -171,6 +174,7 @@ namespace D4Companion.Services
                         {
                             Id = uniqueInfo.IdName,
                             Type = string.Empty,
+                            Variant = variant,
                             Color = _settingsManager.Settings.DefaultColorUniques
                         });
                     }
@@ -205,12 +209,13 @@ namespace D4Companion.Services
                             }
                             else
                             {
-                                if (!affixPreset.ItemAffixes.Any(a => a.Id.Equals(affixInfo.IdName) && a.Type.Equals(itemType)))
+                                if (!affixPreset.ItemAffixes.Any(a => a.Id.Equals(affixInfo.IdName) && a.Type.Equals(itemType) && a.Variant.Equals(variant)))
                                 {
                                     affixPreset.ItemAffixes.Add(new ItemAffix
                                     {
                                         Id = affixInfo.IdName,
                                         Type = itemType,
+                                        Variant = variant,
                                         Color = _settingsManager.Settings.DefaultColorImplicit,
                                         IsImplicit = true,
                                         TuningPrisms = affixInfo.TuningPrisms.ToList()
@@ -321,12 +326,13 @@ namespace D4Companion.Services
                         }
                         else
                         {
-                            if (!affixPreset.ItemAffixes.Any(a => a.Id.Equals(affixInfo.IdName) && a.Type.Equals(itemType) && !a.IsImplicit))
+                            if (!affixPreset.ItemAffixes.Any(a => a.Id.Equals(affixInfo.IdName) && a.Type.Equals(itemType) && a.Variant.Equals(variant) && !a.IsImplicit))
                             {
                                 affixPreset.ItemAffixes.Add(new ItemAffix
                                 {
                                     Id = affixInfo.IdName,
                                     Type = itemType,
+                                    Variant = variant,
                                     Color = explicitAffix.Greater ? _settingsManager.Settings.DefaultColorGreater : _settingsManager.Settings.DefaultColorNormal,
                                     IsGreater = explicitAffix.Greater,
                                     TuningPrisms = affixInfo.TuningPrisms.ToList()
@@ -351,12 +357,13 @@ namespace D4Companion.Services
                         }
                         else
                         {
-                            if (!affixPreset.ItemAffixes.Any(a => a.Id.Equals(affixInfo.IdName) && a.Type.Equals(itemType) && a.IsTempered))
+                            if (!affixPreset.ItemAffixes.Any(a => a.Id.Equals(affixInfo.IdName) && a.Type.Equals(itemType) && a.Variant.Equals(variant) && a.IsTempered))
                             {
                                 affixPreset.ItemAffixes.Add(new ItemAffix
                                 {
                                     Id = affixInfo.IdName,
                                     Type = itemType,
+                                    Variant = variant,
                                     Color = _settingsManager.Settings.DefaultColorTempered,
                                     IsTempered = true,
                                     TuningPrisms = affixInfo.TuningPrisms.ToList()

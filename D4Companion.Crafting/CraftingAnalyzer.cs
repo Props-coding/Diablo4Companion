@@ -162,6 +162,8 @@ namespace D4Companion.Crafting
         public string ValuesStatement { get; init; } = string.Empty;
         /// <summary>Whether the greater affixes your build asks for are present.</summary>
         public string GreaterStatement { get; init; } = string.Empty;
+        /// <summary>Which half of the build the item was compared with, for example "Ring 2". Empty when the slot has only one.</summary>
+        public string ComparedWith { get; init; } = string.Empty;
         public string ItemQualityStatement { get; init; } = CraftingAnalyzer.ItemQualityStatement;
         public string DamageStatement { get; init; } = CraftingAnalyzer.DamageStatement;
     }
@@ -182,6 +184,53 @@ namespace D4Companion.Crafting
         public static CraftingAnalysis Analyze(GearSnapshot snapshot, BuildTarget? build, AdvisorOptions? options = null)
         {
             options ??= new AdvisorOptions();
+
+            // Two slots of one type (rings): compare with the matching half of the build, not both merged.
+            var variants = build?.VariantsFor(snapshot.ItemType) ?? Array.Empty<string>();
+            if (build != null && variants.Count > 1 && snapshot.IsConfirmed)
+            {
+                string variant = PickVariant(snapshot, build, variants, options);
+                var result = AnalyzeCore(snapshot, build.WithVariant(snapshot.ItemType, variant), options);
+                return result with
+                {
+                    ComparedWith = variant,
+                    BuildMatchStatement = result.BuildMatchStatement.Length > 0 ? $"Compared with {variant}. {result.BuildMatchStatement}" : $"Compared with {variant}."
+                };
+            }
+
+            return AnalyzeCore(snapshot, build, options);
+        }
+
+        /// <summary>
+        /// A unique goes with the variant that uses it. Any other item goes with the variant it matches best,
+        /// leaving out variants that are a unique in the build. Ties go to the first variant.
+        /// </summary>
+        private static string PickVariant(GearSnapshot snapshot, BuildTarget build, IReadOnlyList<string> variants, AdvisorOptions options)
+        {
+            var uniqueVariants = build.Uniques
+                .Where(u => u.Variant.Length > 0)
+                .ToList();
+
+            if (snapshot.IsUnique && snapshot.UniqueId.Length > 0)
+            {
+                var own = uniqueVariants.FirstOrDefault(u => string.Equals(u.Id, snapshot.UniqueId, StringComparison.OrdinalIgnoreCase));
+                if (own != null && variants.Contains(own.Variant, StringComparer.OrdinalIgnoreCase)) return own.Variant;
+            }
+
+            var candidates = snapshot.IsUnique
+                ? variants
+                : variants.Where(v => !uniqueVariants.Any(u => string.Equals(u.Variant, v, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (candidates.Count == 0) candidates = variants;
+
+            return candidates
+                .Select((v, index) => (Variant: v, Index: index, Matches: AnalyzeCore(snapshot, build.WithVariant(snapshot.ItemType, v), options).MatchCount))
+                .OrderByDescending(c => c.Matches)
+                .ThenBy(c => c.Index)
+                .First().Variant;
+        }
+
+        private static CraftingAnalysis AnalyzeCore(GearSnapshot snapshot, BuildTarget? build, AdvisorOptions options)
+        {
 
             if (!snapshot.IsConfirmed)
             {

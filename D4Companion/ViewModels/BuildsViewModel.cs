@@ -236,12 +236,13 @@ namespace D4Companion.ViewModels
             {
                 var inSlot = preset.ItemAffixes
                     .Where(a => a.Type.Equals(_selectedSlot, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(a => a.Variant ?? string.Empty, StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
                 // Identical lines (same stat, type and requirements) are shown once.
                 // Different forms of the same stat, such as regular and tempered, stay separate.
                 var groups = inSlot
-                    .GroupBy(a => (Id: a.Id.ToLowerInvariant(), a.IsImplicit, a.IsTempered, a.IsGreater))
+                    .GroupBy(a => (Id: a.Id.ToLowerInvariant(), Variant: (a.Variant ?? string.Empty).ToLowerInvariant(), a.IsImplicit, a.IsTempered, a.IsGreater))
                     .ToList();
                 foreach (var group in groups)
                 {
@@ -257,7 +258,7 @@ namespace D4Companion.ViewModels
                 }
 
                 HasRepeatedStat = groups
-                    .GroupBy(g => g.Key.Id)
+                    .GroupBy(g => (g.Key.Id, g.Key.Variant))
                     .Any(g => g.Count() > 1);
             }
             else
@@ -271,11 +272,12 @@ namespace D4Companion.ViewModels
 
         // Identical copies from an import count as one line.
         private static IEnumerable<(string, string, bool, bool, bool)> UniqueLines(IEnumerable<ItemAffix> affixes) =>
-            affixes.Select(a => (a.Id.ToLowerInvariant(), a.Type.ToLowerInvariant(), a.IsImplicit, a.IsTempered, a.IsGreater)).Distinct();
+            affixes.Select(a => (a.Id.ToLowerInvariant(), (a.Type + "|" + a.Variant).ToLowerInvariant(), a.IsImplicit, a.IsTempered, a.IsGreater)).Distinct();
 
         private static IReadOnlyList<string> Tags(ItemAffix affix)
         {
             var tags = new List<string>();
+            if (!string.IsNullOrWhiteSpace(affix.Variant)) tags.Add(affix.Variant);
             tags.Add(affix.IsImplicit ? "Implicit" : affix.IsTempered ? "Tempered" : "Regular");
             if (affix.IsGreater) tags.Add("Greater wanted");
             if (affix.IsAnyType) tags.Add("Any slot");

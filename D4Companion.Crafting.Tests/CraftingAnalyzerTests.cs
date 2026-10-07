@@ -300,6 +300,59 @@ namespace D4Companion.Crafting.Tests
             Assert.That(result.BuildMatchStatement, Is.EqualTo("1 of this unique's 2 affixes are in your build for this slot."));
         }
 
+        private static TargetAffix RingTarget(string id, string variant) => Target(id) with { Variant = variant };
+
+        // Ring 1 is Wendigo Brand (Willpower, Crit). Ring 2 is a legendary (Life, Armor, Attack Speed, Lucky Hit).
+        private static BuildTarget TwoRingBuild() => Build(
+                RingTarget("Willpower", "Ring 1"), RingTarget("CritChance", "Ring 1"),
+                RingTarget("Life", "Ring 2"), RingTarget("Armor", "Ring 2"), RingTarget("AttackSpeed", "Ring 2"), RingTarget("LuckyHit", "Ring 2"))
+            with { Uniques = new[] { new BuildUnique("Ring_Unique_Generic_103", "Wendigo Brand", "Ring 1") } };
+
+        [Test]
+        public void LegendaryRing_IsComparedWithTheNonUniqueRingOnly()
+        {
+            var item = Ring(Affix("Life"), Affix("Armor"), Affix("AttackSpeed"), Affix("Thorns"));
+
+            var result = CraftingAnalyzer.Analyze(item, TwoRingBuild());
+
+            Assert.That(result.ComparedWith, Is.EqualTo("Ring 2"));
+            Assert.That(result.TargetCount, Is.EqualTo(4));
+            Assert.That(result.Comparisons.Where(c => c.Status == AffixStatus.Missing).Select(c => c.Name), Is.EqualTo(new[] { "LuckyHit" }),
+                "Wendigo Brand's affixes must not show as missing from the other ring.");
+            Assert.That(result.BuildMatchStatement, Does.StartWith("Compared with Ring 2."));
+        }
+
+        [Test]
+        public void UniqueRing_IsComparedWithItsOwnRing()
+        {
+            var item = Ring(Affix("Willpower"), Affix("CritChance")) with { IsUnique = true, UniqueId = "Ring_Unique_Generic_103", UniqueName = "Wendigo Brand" };
+
+            var result = CraftingAnalyzer.Analyze(item, TwoRingBuild());
+
+            Assert.That(result.ComparedWith, Is.EqualTo("Ring 1"));
+            Assert.That(result.Recommendation.Headline, Is.EqualTo("Wendigo Brand is in your build"));
+            Assert.That(result.MatchCount, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void TwoLegendaryRings_ItemGoesToTheBetterMatch()
+        {
+            var build = Build(RingTarget("Willpower", "Ring 1"), RingTarget("CritChance", "Ring 1"),
+                              RingTarget("Life", "Ring 2"), RingTarget("Armor", "Ring 2"));
+
+            Assert.That(CraftingAnalyzer.Analyze(Ring(Affix("Life"), Affix("Armor")), build).ComparedWith, Is.EqualTo("Ring 2"));
+            Assert.That(CraftingAnalyzer.Analyze(Ring(Affix("CritChance")), build).ComparedWith, Is.EqualTo("Ring 1"));
+        }
+
+        [Test]
+        public void BuildWithoutVariants_KeepsTheOldBehaviour()
+        {
+            var result = CraftingAnalyzer.Analyze(Ring(Affix("Life")), Build(Target("Life"), Target("Armor")));
+
+            Assert.That(result.ComparedWith, Is.Empty);
+            Assert.That(result.TargetCount, Is.EqualTo(2));
+        }
+
         [Test]
         public void UniqueNotInBuild_SaysWhichUniquesTheBuildUses()
         {

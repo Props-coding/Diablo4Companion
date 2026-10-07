@@ -388,6 +388,7 @@ namespace D4Companion.State
                             AffixId = a.Id,
                             DisplayName = GetAffixName(a.Id),
                             ItemType = a.Type,
+                            Variant = a.Variant ?? string.Empty,
                             RequireGreater = a.IsGreater,
                             IsTempered = a.IsTempered,
                             IsImplicit = a.IsImplicit,
@@ -397,14 +398,14 @@ namespace D4Companion.State
                         };
                     })
                     // An import can list the same affix twice for a slot. Count it once.
-                    .GroupBy(t => (Id: t.AffixId.ToLowerInvariant(), Type: t.ItemType.ToLowerInvariant(), t.IsImplicit, t.IsTempered))
+                    .GroupBy(t => (Id: t.AffixId.ToLowerInvariant(), Type: t.ItemType.ToLowerInvariant(), Variant: t.Variant.ToLowerInvariant(), t.IsImplicit, t.IsTempered))
                     .Select(g => g.First() with { RequireGreater = g.Any(t => t.RequireGreater) })
                     .ToList();
 
                 var uniques = preset.ItemUniques
                     .Where(u => u != null && !string.IsNullOrWhiteSpace(u.Id))
-                    .Select(u => new BuildUnique(u.Id, GetUniqueName(u.Id)))
-                    .DistinctBy(u => u.Id.ToLowerInvariant())
+                    .Select(u => new BuildUnique(u.Id, GetUniqueName(u.Id), u.Variant ?? string.Empty))
+                    .DistinctBy(u => (u.Id.ToLowerInvariant(), u.Variant.ToLowerInvariant()))
                     .ToList();
 
                 return new BuildTarget { Name = preset.Name, Affixes = targets, Uniques = uniques };

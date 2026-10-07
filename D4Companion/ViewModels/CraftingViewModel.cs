@@ -273,6 +273,7 @@ namespace D4Companion.ViewModels
                 if (!string.IsNullOrWhiteSpace(_itemPowerText)) parts.Add($"{_itemPowerText} Item Power");
                 if (!string.IsNullOrWhiteSpace(_rarity)) parts.Add(CultureInfo.CurrentCulture.TextInfo.ToTitleCase(_rarity.ToLowerInvariant()));
                 if (_isUnique && !string.Equals(_rarity, "Unique", StringComparison.OrdinalIgnoreCase)) parts.Add("Unique");
+                if (ShowRecommendation && _analysis?.ComparedWith is { Length: > 0 } variant) parts.Add($"Compared with {variant} in your build");
                 return string.Join(" · ", parts);
             }
         }
@@ -1190,6 +1191,7 @@ namespace D4Companion.ViewModels
             }
 
             OnPropertyChanged(nameof(ShowRecommendation));
+            OnPropertyChanged(nameof(ItemDetails));
             OnPropertyChanged(nameof(ShowConfirmFirst));
             OnPropertyChanged(nameof(VerdictText));
             OnPropertyChanged(nameof(MeetsTarget));
