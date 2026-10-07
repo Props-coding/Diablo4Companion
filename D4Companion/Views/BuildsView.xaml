@@ -1,0 +1,258 @@
+<UserControl
+    x:Class="D4Companion.Views.BuildsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+    xmlns:viewModels="clr-namespace:D4Companion.ViewModels"
+    xmlns:converters="clr-namespace:D4Companion.Converters"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=viewModels:BuildsViewModel}"
+    d:DesignHeight="900" d:DesignWidth="1200">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!-- A build card. Gold border when it is the active build. -->
+        <Style x:Key="BuildCardButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Width" Value="240" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{StaticResource Companion.Brush.Surface}" BorderBrush="{StaticResource Companion.Brush.Border}"
+                                BorderThickness="1" CornerRadius="8" Padding="16,14">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Slot tab -->
+        <Style x:Key="SlotTabButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,6,6" />
+            <Setter Property="Foreground" Value="{StaticResource Companion.Brush.TextMuted}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="1" CornerRadius="14" Padding="12,4">
+                            <TextBlock x:Name="Label" Text="{Binding Label}" FontSize="13" Foreground="{TemplateBinding Foreground}" FontFamily="{StaticResource Companion.Font}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Companion.Brush.SurfaceRaised}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Companion.Brush.GoldSoft}" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Companion.Brush.Gold}" />
+                                <Setter TargetName="Label" Property="Foreground" Value="{StaticResource Companion.Brush.Gold}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="BUILDS" Style="{StaticResource Companion.Text.Eyebrow}" />
+                <TextBlock Text="Your builds" Style="{StaticResource Companion.Text.PageTitle}" Margin="0,2,0,0" />
+                <TextBlock Text="Pick the build your gear is compared with. Import one from Maxroll or Mobalytics, or add affixes yourself."
+                           Style="{StaticResource Companion.Text.Muted}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                <Button Content="{Binding AdvancedEditorButtonText}" Command="{Binding ToggleAdvancedEditorCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="0,0,10,0"
+                        ToolTip="The original editor: aspects, uniques, runes, colours, renaming and deleting builds." />
+                <Button Content="Import build" Command="{Binding ImportCommand}" Style="{StaticResource Companion.Button.Primary}"
+                        ToolTip="Import from Maxroll, Mobalytics and other sites. For Maxroll, use a planner link, like maxroll.gg/d4/planner/..." />
+            </StackPanel>
+        </Grid>
+
+        <!-- Main builds page -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Visibility="{Binding IsMainOpen, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Margin="0,0,4,24">
+
+                <!-- Build cards -->
+                <TextBlock Text="No builds yet. Press Import build to bring one in from Maxroll or Mobalytics."
+                           Style="{StaticResource Companion.Text.Muted}" Margin="0,0,0,16"
+                           Visibility="{Binding HasBuilds, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
+                <ItemsControl ItemsSource="{Binding Builds}" Margin="0,0,0,8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource BuildCardButton}"
+                                    Command="{Binding DataContext.SelectBuildCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                        <Border Grid.Column="1" Style="{StaticResource Companion.Tag.Gold}" Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="Active" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Grid Visibility="{Binding HasActiveBuild, Converter={StaticResource BoolToVisibility}}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="420" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Affixes per slot -->
+                    <Border Style="{StaticResource Companion.Card}" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource Companion.Text.CardTitle}">
+                                <Run Text="{Binding ActiveBuildName, Mode=OneWay}" /><Run Text=" · what this build wants" Foreground="{StaticResource Companion.Brush.TextMuted}" FontWeight="Normal" />
+                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding Slots}" Margin="0,12,0,6">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource SlotTabButton}"
+                                                Command="{Binding DataContext.SelectSlotCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,8,0,0"
+                                       Visibility="{Binding HasSlotAffixes, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}">
+                                <Run Text="No affixes for" /> <Run Text="{Binding SelectedSlotName, Mode=OneWay}" /><Run Text=". Search on the right to add some." />
+                            </TextBlock>
+
+                            <ItemsControl ItemsSource="{Binding SlotAffixes}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,1,0,0" Padding="0,10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Companion.Text}" FontSize="15" TextWrapping="NoWrap" VerticalAlignment="Center" />
+                                                        <ItemsControl ItemsSource="{Binding Tags}" VerticalAlignment="Center">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Orientation="Horizontal" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Style="{StaticResource Companion.Tag}">
+                                                                        <TextBlock Text="{Binding}" />
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                    <ItemsControl ItemsSource="{Binding Prisms}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
+                                                                  ItemsPanel="{StaticResource Companion.WrapPanel}"
+                                                                  Visibility="{Binding HasPrisms, Converter={StaticResource BoolToVisibility}}" />
+                                                    <TextBlock Text="{Binding MergedText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,4,0,0"
+                                                               Visibility="{Binding IsMerged, Converter={StaticResource BoolToVisibility}}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Remove" Style="{StaticResource Companion.Button.Link}" Foreground="{StaticResource Companion.Brush.TextMuted}"
+                                                        VerticalAlignment="Top"
+                                                        Command="{Binding DataContext.RemoveAffixCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="Some stats are listed with two types, for example regular and tempered. Each needs its own affix on the item."
+                                       Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,10,0,0"
+                                       Visibility="{Binding HasRepeatedStat, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBlock Text="To require a greater affix or a minimum value, use the Advanced editor."
+                                       Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Search and add -->
+                    <Border Grid.Column="2" Style="{StaticResource Companion.Card}" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="Add an affix" Style="{StaticResource Companion.Text.CardTitle}" />
+                            <TextBlock Text="{Binding AddTargetText}" Style="{StaticResource Companion.Text.Muted}" Margin="0,2,0,10" />
+                            <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged, Delay=200}"
+                                     mah:TextBoxHelper.Watermark="Search, for example: critical" mah:TextBoxHelper.ClearTextButton="True" />
+                            <ComboBox ItemsSource="{Binding ClassOptions}" SelectedItem="{Binding SelectedClass, Mode=TwoWay}" Margin="0,8,0,0" />
+                            <TextBlock Text="{Binding SearchHint}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,8,0,4" />
+                            <ItemsControl ItemsSource="{Binding SearchResults}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,1,0,0" Padding="0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource Companion.Text}" FontSize="13" />
+                                                    <TextBlock Text="{Binding Classes}" Style="{StaticResource Companion.Text.Muted}" FontSize="11" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Add" Style="{StaticResource Companion.Button.Link}" VerticalAlignment="Center"
+                                                        Command="{Binding DataContext.AddAffixCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- The original editor. It stays loaded so imports and overlay hotkeys keep working. -->
+        <ContentControl x:Name="AdvancedEditorHost" Grid.Row="1"
+                        Visibility="{Binding IsAdvancedEditorOpen, Converter={StaticResource BoolToVisibility}}" />
+    </Grid>
+</UserControl>

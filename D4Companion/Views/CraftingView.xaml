@@ -1,0 +1,456 @@
+<UserControl
+    x:Class="D4Companion.Views.CraftingView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="clr-namespace:D4Companion.ViewModels"
+    xmlns:local="clr-namespace:D4Companion.Views"
+    xmlns:converters="clr-namespace:D4Companion.Converters"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=viewModels:CraftingViewModel}"
+    d:DesignHeight="900" d:DesignWidth="1200">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
+    <UserControl.InputBindings>
+        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteScreenshotCommand}" />
+    </UserControl.InputBindings>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="CRAFTING ADVISOR" Style="{StaticResource Companion.Text.Eyebrow}" />
+                <TextBlock Text="Refine your next upgrade" Style="{StaticResource Companion.Text.PageTitle}" Margin="0,2,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+                <ComboBox ItemsSource="{Binding PresetNames}" SelectedItem="{Binding SelectedPresetName, Mode=TwoWay}" Width="220" Margin="0,0,10,0"
+                          ToolTip="The build the item is compared with." />
+                <Button Content="{Binding ScannerButtonText}" Command="{Binding ToggleScannerCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="0,0,10,0"
+                        ToolTip="The scanner only reads items while it is on." />
+                <Button Content="Capture new scan" Command="{Binding CaptureScanCommand}" Style="{StaticResource Companion.Button.Secondary}"
+                        ToolTip="Save a copy of the item the scanner is reading right now. The copy will not change when you move the mouse." />
+                <Button Content="Paste screenshot" Command="{Binding PasteScreenshotCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="10,0,0,0"
+                        ToolTip="In the game, hover the item, press Win+Shift+S and drag around its tooltip. Then press this (or Ctrl+V here)." />
+            </StackPanel>
+        </Grid>
+
+        <!-- Next action before the item is confirmed. Afterwards the Next action card on the right takes over. -->
+        <Border Grid.Row="1" Style="{StaticResource Companion.ActionBar}" Margin="0,0,0,16"
+                Visibility="{Binding ShowNextActionBar, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="NEXT STEP" Style="{StaticResource Companion.Text.Eyebrow}" />
+                    <TextBlock Text="{Binding NextActionTitle}" Style="{StaticResource Companion.Text.CardTitle}" Margin="0,2,0,0" />
+                    <TextBlock Text="{Binding NextActionDetail}" Style="{StaticResource Companion.Text.Muted}" Margin="0,2,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <Button Content="Capture scan" Command="{Binding CaptureScanCommand}" Style="{StaticResource Companion.Button.Primary}"
+                            Visibility="{Binding ShowCaptureAction, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Content="Looks right, confirm" Command="{Binding ConfirmCommand}" Style="{StaticResource Companion.Button.Primary}"
+                            Visibility="{Binding ShowConfirmAction, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Content="Save to My Gear" Command="{Binding SaveCommand}" Style="{StaticResource Companion.Button.Primary}"
+                            Visibility="{Binding ShowSaveAction, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Content="Rescan after crafting" Command="{Binding RescanAfterCraftingCommand}" Style="{StaticResource Companion.Button.Primary}"
+                            Visibility="{Binding ShowRescanAction, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Hover over the crafted item in-game first. The new scan is compared with the saved one." />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- One scroll area for the item and the advice -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="0,0,4,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="420" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="340" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
+
+                    <!-- Item card -->
+                    <Border Style="{StaticResource Companion.Card}" Margin="0,0,0,16">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding ItemName}" Style="{StaticResource Companion.Text.Headline}" />
+                                    <TextBlock Text="{Binding ItemDetails}" Style="{StaticResource Companion.Text.Muted}" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"
+                                            Visibility="{Binding HasItem, Converter={StaticResource BoolToVisibility}}">
+                                    <Button Content="{Binding EditButtonText}" Command="{Binding EditScanCommand}" Style="{StaticResource Companion.Button.Secondary}" Padding="12,5" />
+                                    <Button Content="Clear" Command="{Binding ClearCommand}" Style="{StaticResource Companion.Button.Link}" Margin="8,0,0,0" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="Turn the scanner on, hover over a piece of gear in Diablo IV, then press Capture scan. Or take a screenshot of the item's tooltip (Win+Shift+S) and press Paste screenshot."
+                                       Style="{StaticResource Companion.Text.Muted}" Margin="0,14,0,0"
+                                       Visibility="{Binding HasItem, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
+                            <TextBlock Text="{Binding LiveScanText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,6,0,0"
+                                       Visibility="{Binding HasItem, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
+
+                            <!-- Reading mode: clean affix rows -->
+                            <ItemsControl ItemsSource="{Binding Affixes}" Margin="0,14,0,0">
+                                <ItemsControl.Style>
+                                    <Style TargetType="ItemsControl">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding HasItem}" Value="True" />
+                                                    <Condition Binding="{Binding IsReading}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ItemsControl.Style>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,1,0,0" Padding="0,10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="&#x2605;" Foreground="{StaticResource Companion.Brush.Gold}" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                                   Visibility="{Binding IsGreater, Converter={StaticResource BoolToVisibility}}" ToolTip="Greater affix" />
+                                                        <TextBlock Style="{StaticResource Companion.Text}" FontSize="15" TextWrapping="NoWrap" VerticalAlignment="Center">
+                                                            <Run Text="{Binding DisplayName, Mode=OneWay}" /><Run Text=" · " Foreground="{StaticResource Companion.Brush.TextFaint}" /><Run Text="{Binding ValueDisplay, Mode=OneWay}" FontWeight="SemiBold" />
+                                                        </TextBlock>
+                                                        <Border Style="{StaticResource Companion.Tag.Gold}" Visibility="{Binding HasKindTag, Converter={StaticResource BoolToVisibility}}">
+                                                            <TextBlock Text="{Binding KindTag}" />
+                                                        </Border>
+                                                        <Border Style="{StaticResource Companion.Tag}" Visibility="{Binding IsProtected, Converter={StaticResource BoolToVisibility}}"
+                                                                ToolTip="Greater affixes are kept out of suggestions. Tick &quot;Include greater affixes&quot; in the recommendation to change this.">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="10" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                                <TextBlock Text="Protected: greater affix" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <ItemsControl ItemsSource="{Binding Prisms}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
+                                                                  ItemsPanel="{StaticResource Companion.WrapPanel}"
+                                                                  Visibility="{Binding HasPrisms, Converter={StaticResource BoolToVisibility}}" />
+                                                    <TextBlock Text="{Binding Explanation}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,4,0,0" />
+                                                    <TextBlock Text="{Binding Issue}" Foreground="{StaticResource Companion.Brush.Warning}" FontSize="12" Margin="0,2,0,0"
+                                                               Style="{StaticResource Companion.Text}" Visibility="{Binding HasIssue, Converter={StaticResource BoolToVisibility}}" />
+                                                </StackPanel>
+                                                <CheckBox Grid.Column="1" Content="Keep" IsChecked="{Binding IsKeep}" VerticalAlignment="Top" Margin="12,2,0,0"
+                                                          ToolTip="Keep: never suggest replacing this affix." />
+                                                <Border Grid.Column="2" Style="{StaticResource Companion.StatusPill}" VerticalAlignment="Top" Margin="12,0,0,0">
+                                                    <TextBlock Text="{Binding StatusText}" FontSize="12" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Editing mode: dropdowns and inputs -->
+                            <StackPanel Margin="0,14,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding HasItem}" Value="True" />
+                                                    <Condition Binding="{Binding IsEditing}" Value="True" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+
+                                <WrapPanel>
+                                    <StackPanel Margin="0,0,16,8" Width="170">
+                                        <TextBlock Text="Slot" Style="{StaticResource Companion.Text.Muted}" />
+                                        <ComboBox ItemsSource="{Binding SlotOptions}" DisplayMemberPath="Name" SelectedValuePath="Id"
+                                                  SelectedValue="{Binding ItemType, Mode=TwoWay}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,16,8" Width="110">
+                                        <TextBlock Text="Item power" Style="{StaticResource Companion.Text.Muted}" />
+                                        <TextBox Text="{Binding ItemPowerText, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,16,8" Width="140">
+                                        <TextBlock Text="Rarity" Style="{StaticResource Companion.Text.Muted}" />
+                                        <TextBox Text="{Binding Rarity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Content="Unique item" IsChecked="{Binding IsUnique}" VerticalAlignment="Bottom" Margin="0,0,0,12" />
+                                </WrapPanel>
+
+                                <Grid Margin="0,8,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="30" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Type" Style="{StaticResource Companion.Text.Muted}" />
+                                    <TextBlock Grid.Column="1" Text="Affix" Style="{StaticResource Companion.Text.Muted}" Margin="8,0,0,0" />
+                                    <TextBlock Grid.Column="2" Text="Value" Style="{StaticResource Companion.Text.Muted}" Margin="8,0,0,0" />
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding Affixes}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,1,0,0" Padding="0,8">
+                                                <StackPanel>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="110" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="90" />
+                                                            <ColumnDefinition Width="30" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <ComboBox Grid.Column="0"
+                                                                  ItemsSource="{Binding DataContext.KindOptions, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                  SelectedItem="{Binding Kind, Mode=TwoWay}" />
+                                                        <ComboBox Grid.Column="1" Margin="8,0,0,0"
+                                                                  IsEditable="False" IsTextSearchEnabled="True" TextSearch.TextPath="Name"
+                                                                  ItemsSource="{Binding Catalog}"
+                                                                  DisplayMemberPath="Name"
+                                                                  SelectedItem="{Binding SelectedAffix, Mode=TwoWay}"
+                                                                  ToolTip="Click, then start typing to jump to an affix.">
+                                                            <ComboBox.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <VirtualizingStackPanel />
+                                                                </ItemsPanelTemplate>
+                                                            </ComboBox.ItemsPanel>
+                                                        </ComboBox>
+                                                        <TextBox Grid.Column="2" Margin="8,0,0,0"
+                                                                 Text="{Binding ValueText, UpdateSourceTrigger=LostFocus}" />
+                                                        <Button Grid.Column="3" Content="✕" Style="{StaticResource Companion.Button.Link}" Foreground="{StaticResource Companion.Brush.TextMuted}"
+                                                                Command="{Binding DataContext.RemoveAffixCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding}" ToolTip="Remove this line" />
+                                                    </Grid>
+                                                    <TextBlock Margin="118,4,0,0" Text="{Binding ScannedText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" TextWrapping="Wrap"
+                                                               Visibility="{Binding HasScannedText, Converter={StaticResource BoolToVisibility}}" />
+                                                    <TextBlock Margin="118,2,0,0" Text="{Binding Issue}" Foreground="{StaticResource Companion.Brush.Warning}" FontSize="12"
+                                                               Style="{StaticResource Companion.Text}" Visibility="{Binding HasIssue, Converter={StaticResource BoolToVisibility}}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Button Content="Add affix line" Command="{Binding AddAffixCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,6,0,0" />
+                            </StackPanel>
+
+                            <!-- Validation -->
+                            <Border Style="{StaticResource Companion.Callout.Warning}" Margin="0,12,0,0"
+                                    Visibility="{Binding HasValidationIssues, Converter={StaticResource BoolToVisibility}}">
+                                <ItemsControl ItemsSource="{Binding ValidationIssues}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" Style="{StaticResource Companion.Text}" Foreground="{StaticResource Companion.Brush.Warning}" Margin="0,1" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+
+                            <!-- Crafting limits: what the player knows the item can no longer take. -->
+                            <Expander Style="{StaticResource Companion.Expander}" Margin="0,12,0,0"
+                                      Visibility="{Binding HasItem, Converter={StaticResource BoolToVisibility}}">
+                                <Expander.Header>
+                                    <TextBlock Style="{StaticResource Companion.Text}">
+                                        <Run Text="Crafting limits" FontWeight="SemiBold" /><Run Text="  " /><Run Text="{Binding CraftLimitsSummary, Mode=OneWay}" Foreground="{StaticResource Companion.Brush.TextMuted}" FontSize="12" />
+                                    </TextBlock>
+                                </Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="Anything left as Not checked becomes a question to answer in-game before you craft. Answer it here once and the advisor stops asking."
+                                               Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,0,0,8" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Text="Can it still be changed?" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3" />
+                                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{x:Static viewModels:CraftingViewModel.CanChangeOptions}" DisplayMemberPath="Name"
+                                                  SelectedValuePath="Key" SelectedValue="{Binding CanChangeKey, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" Margin="0,3" />
+                                        <TextBlock Grid.Row="1" Text="Tempers left?" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3" />
+                                        <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static viewModels:CraftingViewModel.TemperOptions}" DisplayMemberPath="Name"
+                                                  SelectedValuePath="Key" SelectedValue="{Binding TempersKey, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" Margin="0,3" />
+                                        <TextBlock Grid.Row="2" Text="Masterwork ranks left?" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3" />
+                                        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{x:Static viewModels:CraftingViewModel.MasterworkOptions}" DisplayMemberPath="Name"
+                                                  SelectedValuePath="Key" SelectedValue="{Binding MasterworkKey, Mode=TwoWay}" Width="200" HorizontalAlignment="Left" Margin="0,3" />
+                                        <TextBlock Grid.Row="3" Text="Enchanted affix" Style="{StaticResource Companion.Text}" VerticalAlignment="Center" Margin="0,3,12,3"
+                                                   ToolTip="The Occultist allows one enchanted affix per item." />
+                                        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding EnchantOptions}" SelectedItem="{Binding SelectedEnchant, Mode=TwoWay}"
+                                                  DisplayMemberPath="Name" Width="280" HorizontalAlignment="Left" Margin="0,3" />
+                                    </Grid>
+                                    <StackPanel Margin="0,10,0,0" Visibility="{Binding HasRuledOut, Converter={StaticResource BoolToVisibility}}">
+                                        <TextBlock Text="Ruled out in-game" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
+                                        <ItemsControl ItemsSource="{Binding RuledOut}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
+                                                        <Run Text="&#x2715;" Foreground="{StaticResource Companion.Brush.Danger}" /> <Run Text="{Binding Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Command="{Binding ClearRuledOutCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,4,0,0">
+                                            <TextBlock Text="Clear ruled-out steps" FontSize="12" />
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- Footer -->
+                            <Grid Margin="0,14,0,0" Visibility="{Binding HasItem, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Style="{StaticResource Companion.Tag.Gold}" Margin="0,0,8,0" Visibility="{Binding IsConfirmed, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="&#x2713; Confirmed" FontSize="12" FontWeight="SemiBold" />
+                                        </Border>
+                                        <TextBlock Text="{Binding ConfirmationText}" Style="{StaticResource Companion.Text.Muted}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding StatusMessage}" FontSize="13" Foreground="{StaticResource Companion.Brush.Gold}" Margin="0,4,0,0">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Companion.Text}">
+                                                <Style.Triggers>
+                                                    <Trigger Property="Text" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The full plan, with room to read it -->
+                    <local:CraftingPlanCard Margin="0,0,0,16" />
+
+                    <!-- Details, folded away -->
+                    <Border Style="{StaticResource Companion.Card}" Padding="18,6" Margin="0,0,0,16">
+                        <StackPanel>
+                            <Expander Style="{StaticResource Companion.Expander}" Header="Compare with your build"
+                                      Visibility="{Binding ShowRecommendation, Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding BuildMatchStatement}" Style="{StaticResource Companion.Text.Muted}" Margin="0,0,0,8" />
+                                    <ItemsControl ItemsSource="{Binding Comparisons}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,5" ToolTip="{Binding Explanation}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="110" />
+                                                        <ColumnDefinition Width="170" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Name}" Style="{StaticResource Companion.Text}" Margin="0,0,8,0" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding ItemValue}" Style="{StaticResource Companion.Text.Muted}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Requirement}" Style="{StaticResource Companion.Text.Muted}" />
+                                                    <Border Grid.Column="3" Style="{StaticResource Companion.StatusPill}">
+                                                        <TextBlock Text="{Binding StatusText}" FontSize="12" />
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Expander>
+
+                            <Expander Style="{StaticResource Companion.Expander}" Header="Crafting history">
+                                <StackPanel>
+                                    <TextBlock Text="Save the item to start its history. After each craft, rescan and save again to compare before and after."
+                                               Style="{StaticResource Companion.Text.Muted}" Visibility="{Binding HasHistory, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
+                                    <ItemsControl ItemsSource="{Binding History}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="140" />
+                                                        <ColumnDefinition Width="160" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Label}" Style="{StaticResource Companion.Text}" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding When}" Style="{StaticResource Companion.Text.Muted}" />
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" />
+                                                        <TextBlock Text="{Binding Tried}" Style="{StaticResource Companion.Text.Muted}" FontSize="12"
+                                                                   Visibility="{Binding HasTried, Converter={StaticResource BoolToVisibility}}" />
+                                                        <TextBlock Text="{Binding Result}" Style="{StaticResource Companion.Text}" FontSize="12"
+                                                                   Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <Button Command="{Binding CopyTrialLogCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                            Visibility="{Binding HasHistory, Converter={StaticResource BoolToVisibility}}"
+                                            ToolTip="Copies every saved version of this item, with what was tried and what happened, so you can share a test run.">
+                                        <TextBlock Text="Copy trial log" FontSize="12" />
+                                    </Button>
+
+                                    <StackPanel Visibility="{Binding HasChanges, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+                                        <TextBlock Text="{Binding ChangesTitle}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
+                                        <ItemsControl ItemsSource="{Binding Changes}" Margin="0,6,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="200" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Companion.Text}" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Change}" Style="{StaticResource Companion.Text.Muted}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Advice -->
+                <local:RecommendationPanel Grid.Column="2" VerticalAlignment="Top" />
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

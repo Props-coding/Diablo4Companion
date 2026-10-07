@@ -1,0 +1,39 @@
+name: Build and test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the app
+        run: dotnet build D4Companion.sln --configuration Release
+
+      - name: Run crafting tests
+        run: dotnet test D4Companion.Crafting.Tests --configuration Release --no-build
+
+      # A ready-to-run copy of the app for testing. It includes .NET, so nothing else needs installing.
+      # Download it from the "Artifacts" section of the workflow run.
+      - name: Package the app for testing
+        run: dotnet publish D4Companion/D4Companion.csproj --configuration Release --runtime win-x64 --self-contained true --output publish
+
+      - name: Upload the app
+        uses: actions/upload-artifact@v4
+        with:
+          name: D4Companion-test-build
+          path: publish
+          retention-days: 14

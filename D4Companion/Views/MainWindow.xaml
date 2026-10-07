@@ -9,15 +9,21 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
     xmlns:viewModels="clr-namespace:D4Companion.ViewModels"
-    xmlns:loc="clr-namespace:D4Companion.Localization;assembly=D4Companion.Localization" 
+    xmlns:loc="clr-namespace:D4Companion.Localization;assembly=D4Companion.Localization"
     xmlns:tb="http://www.hardcodet.net/taskbar"
     mah:DialogParticipation.Register="{Binding}"
     mc:Ignorable="d"
     d:DataContext="{d:DesignInstance Type=viewModels:MainWindowViewModel}"
-    Title="{Binding WindowTitle}" Height="625" Width="1150"
+    Title="{Binding WindowTitle}" Height="760" Width="1280" MinWidth="420" MinHeight="420"
     Topmost="{Binding IsTopMost}"
+    Background="{StaticResource Companion.Brush.Obsidian}"
+    WindowTitleBrush="{StaticResource Companion.Brush.Charcoal}"
+    NonActiveWindowTitleBrush="{StaticResource Companion.Brush.Charcoal}"
+    GlowBrush="{StaticResource Companion.Brush.Border}"
+    BorderBrush="{StaticResource Companion.Brush.Border}"
+    TitleCharacterCasing="Normal"
     WindowStartupLocation="CenterScreen">
-    
+
     <b:Interaction.Triggers>
         <b:EventTrigger EventName="Closing">
             <b:InvokeCommandAction Command="{Binding WindowClosingCommand}"/>
@@ -50,42 +56,28 @@
         </mah:WindowCommands>
     </mah:MetroWindow.LeftWindowCommands>
 
+    <mah:MetroWindow.RightWindowCommands>
+        <mah:WindowCommands>
+            <Button x:Name="CompactModeButton" Click="CompactModeButton_Click" ToolTip="Switch between the full window and the compact second-monitor view">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconMaterial Width="16" Height="16" Kind="PictureInPictureBottomRight" VerticalAlignment="Center" />
+                    <TextBlock x:Name="CompactModeButtonText" Text="Compact mode" Margin="6,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </mah:WindowCommands>
+    </mah:MetroWindow.RightWindowCommands>
+
     <mah:MetroWindow.Resources>
-        <ResourceDictionary>
-            <!--  This is the template for the menu items.  -->
-            <DataTemplate x:Key="MenuItemTemplate" DataType="{x:Type mah:HamburgerMenuIconItem}">
-                <Grid Height="48">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="{Binding RelativeSource={RelativeSource AncestorType={x:Type mah:HamburgerMenu}}, Path=CompactPaneLength}" />
-                        <ColumnDefinition />
-                    </Grid.ColumnDefinitions>
-                    <mah:Badged Margin="12"
-                                Badge="{Binding Tag.DataContext.BadgeCount}"
-                                BadgeBackground="Red"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center">
-                        <ContentControl 
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Content="{Binding Icon}"
-                                    Focusable="False"
-                                    IsTabStop="False" />
-                    </mah:Badged>
-                    <TextBlock Grid.Column="1"
-                               VerticalAlignment="Center"
-                               FontSize="16"
-                               Text="{Binding Label}" />
-                </Grid>
-            </DataTemplate>
-        </ResourceDictionary>
+        <Style x:Key="NavIcon" TargetType="iconPacks:PackIconMaterial">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
     </mah:MetroWindow.Resources>
 
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <tb:TaskbarIcon 
+        <tb:TaskbarIcon
             x:Name="NotifyIcon"
             Visibility="Visible"
             ToolTipText="Diablo IV Companion"
@@ -93,7 +85,7 @@
             MenuActivation="LeftOrRightClick"
             PopupActivation="DoubleClick"
             DoubleClickCommand="{Binding NotifyIconDoubleClickCommand}">
-            
+
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu Background="#333333">
                     <MenuItem Header="Open" Command="{Binding NotifyIconOpenCommand}" />
@@ -102,76 +94,102 @@
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
 
-        <mah:HamburgerMenu x:Name="HamburgerMenuControl"
-                               HamburgerWidth="48"
-                               IsPaneOpen="False"
-                               ItemInvoked="HamburgerMenuControl_ItemInvoked"
-                               ItemTemplate="{StaticResource MenuItemTemplate}"
-                               OptionsItemTemplate="{StaticResource MenuItemTemplate}"
-                               SelectedIndex="0"
-                               VerticalScrollBarOnLeftSide="False">
-            <!--  Items  -->
-            <mah:HamburgerMenu.ItemsSource>
-                <mah:HamburgerMenuItemCollection>
-                    <mah:HamburgerMenuIconItem Icon="{iconPacks:Material Kind=Tooltip}" Label="{loc:LocExtension rsCapAffixes}">
-                        <mah:HamburgerMenuIconItem.Tag>
-                            <local:AffixView />
-                        </mah:HamburgerMenuIconItem.Tag>
-                    </mah:HamburgerMenuIconItem>
-                    <mah:HamburgerMenuIconItem Icon="{iconPacks:Material Kind=ScaleBalance}" Label="{loc:LocExtension rsCapTrading}">
-                        <mah:HamburgerMenuIconItem.Tag>
-                            <local:TradeView />
-                        </mah:HamburgerMenuIconItem.Tag>
-                    </mah:HamburgerMenuIconItem>
-                    <mah:HamburgerMenuIconItem Icon="{iconPacks:Material Kind=TooltipTextOutline}" Label="{loc:LocExtension rsCapLogging}">
-                        <mah:HamburgerMenuIconItem.Tag>
-                            <local:LoggingView />
-                        </mah:HamburgerMenuIconItem.Tag>
-                    </mah:HamburgerMenuIconItem>
-                    <mah:HamburgerMenuIconItem Icon="{iconPacks:Material Kind=Bug}" Label="{loc:LocExtension rsCapDebug}">
-                        <mah:HamburgerMenuIconItem.Tag>
-                            <local:DebugView />
-                        </mah:HamburgerMenuIconItem.Tag>
-                    </mah:HamburgerMenuIconItem>
-                </mah:HamburgerMenuItemCollection>
-            </mah:HamburgerMenu.ItemsSource>
+        <!-- Full desktop layout -->
+        <Grid x:Name="FullLayout">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
 
-            <!--  Options  -->
+            <!-- Navigation -->
+            <Border Grid.Column="0" Background="{StaticResource Companion.Brush.Charcoal}" BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,0,1,0">
+                <DockPanel Margin="0,16,0,12">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="22,0,0,22">
+                        <TextBlock Text="D" FontFamily="Georgia" FontSize="26" FontWeight="Bold" Foreground="{StaticResource Companion.Brush.Crimson}" VerticalAlignment="Center" />
+                        <TextBlock Text="D4 Companion" Style="{StaticResource Companion.Text}" FontSize="17" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
 
-            <mah:HamburgerMenu.OptionsItemsSource>
-                <mah:HamburgerMenuItemCollection>
-                    <mah:HamburgerMenuIconItem Icon="{iconPacks:Material Kind=Cog}" Label="{loc:LocExtension rsCapSettings}">
-                        <mah:HamburgerMenuIconItem.Tag>
-                            <local:SettingsView />
-                        </mah:HamburgerMenuIconItem.Tag>
-                    </mah:HamburgerMenuIconItem>
-                </mah:HamburgerMenuItemCollection>
-            </mah:HamburgerMenu.OptionsItemsSource>
+                    <!-- Bottom: settings and the original tools -->
+                    <StackPanel DockPanel.Dock="Bottom">
+                        <Border Style="{StaticResource Companion.GoldRule}" Margin="20,8,20,8" />
+                        <TextBlock Text="MORE TOOLS" Style="{StaticResource Companion.Text.Eyebrow}" Foreground="{StaticResource Companion.Brush.TextFaint}" Margin="24,4,0,4" />
+                        <RadioButton x:Name="NavTrading" Tag="Trading" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton.Small}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="ScaleBalance" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="{loc:LocExtension rsCapTrading}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavLogging" Tag="Logging" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton.Small}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="TooltipTextOutline" Style="{StaticResource NavIcon}" />
+                                <mah:Badged x:Name="LoggingBadge" Badge="{Binding BadgeCount}" BadgeBackground="{StaticResource Companion.Brush.Crimson}" BadgePlacementMode="Right">
+                                    <TextBlock Text="{loc:LocExtension rsCapLogging}" Margin="0,0,14,0" />
+                                </mah:Badged>
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavDebug" Tag="Debug" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton.Small}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="Bug" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="{loc:LocExtension rsCapDebug}" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavSettings" Tag="Settings" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton}" Margin="10,8,10,2">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="Cog" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="Settings" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
 
-            <mah:HamburgerMenu.ContentTemplate>
-                <DataTemplate DataType="{x:Type mah:HamburgerMenuIconItem}">
-                    <Grid Margin="20 0 10 0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0"
-                                   Margin="0 15 0 5"
-                                   Padding="0"
-                                   FontFamily="{DynamicResource MahApps.Fonts.Family.Header}"
-                                   FontSize="{DynamicResource MahApps.Font.Size.Header}"
-                                   Text="{Binding Label}" />
-                        <ScrollViewer Grid.Row="1"
-                                      Focusable="False"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Disabled">
-                            <ContentControl Content="{Binding Tag}" Focusable="False" />
-                        </ScrollViewer>
-                    </Grid>
-                </DataTemplate>
-            </mah:HamburgerMenu.ContentTemplate>
+                    <!-- Main navigation -->
+                    <StackPanel>
+                        <RadioButton x:Name="NavOverview" Tag="Overview" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="Home" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="Overview" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavGear" Tag="Gear" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="ShieldHalfFull" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="My Gear" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavCrafting" Tag="Crafting" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="Anvil" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="Crafting Advisor" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton x:Name="NavBuilds" Tag="Builds" Checked="NavButton_Checked" Style="{StaticResource Companion.NavButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <iconPacks:PackIconMaterial Kind="BookOpenVariant" Style="{StaticResource NavIcon}" />
+                                <TextBlock Text="Builds" />
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
 
-        </mah:HamburgerMenu>
+            <!-- Page content. Pages are created once and kept, like the old menu did. -->
+            <ContentControl x:Name="PageHost" Grid.Column="1" Margin="28,22,28,12" Focusable="False" />
+        </Grid>
+
+        <!-- Compact second-monitor layout -->
+        <Grid x:Name="CompactLayout" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Background="{StaticResource Companion.Brush.Charcoal}" BorderBrush="{StaticResource Companion.Brush.Border}" BorderThickness="0,0,0,1" Padding="12,8">
+                <Grid>
+                    <TextBlock Text="Crafting Advisor" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <CheckBox x:Name="CompactTopMost" Content="Always on top" HorizontalAlignment="Right" VerticalAlignment="Center" IsChecked="True"
+                              Checked="CompactTopMost_Changed" Unchecked="CompactTopMost_Changed" />
+                </Grid>
+            </Border>
+            <ContentControl x:Name="CompactHost" Grid.Row="1" Focusable="False" />
+        </Grid>
     </Grid>
 
 </mah:MetroWindow>

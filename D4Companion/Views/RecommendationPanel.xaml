@@ -1,0 +1,211 @@
+<UserControl
+    x:Class="D4Companion.Views.RecommendationPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="clr-namespace:D4Companion.ViewModels"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=viewModels:CraftingViewModel}"
+    d:DesignHeight="800" d:DesignWidth="340">
+
+    <!-- Shared by the Crafting Advisor page and the compact second-monitor view. DataContext: CraftingViewModel.
+         A short Next action card: one instruction and the Rescan button. The reasoning is folded away; the full plan sits under the item. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Companion.Card}">
+        <StackPanel>
+            <TextBlock Text="NEXT ACTION" Style="{StaticResource Companion.Text.Eyebrow}" />
+            <TextBlock Text="{Binding CardHeadline}" Style="{StaticResource Companion.Text.Headline}" Margin="0,6,0,0" />
+            <TextBlock Text="{Binding ConditionalStep}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" Margin="0,8,0,0"
+                       Visibility="{Binding NeedsInGameCheck, Converter={StaticResource BoolToVisibility}}" />
+
+            <!-- The one instruction: where, which prism, what to aim for. The reasoning is folded away below. -->
+            <StackPanel Margin="0,8,0,0" Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding InstructionPlace}" Style="{StaticResource Companion.Text}" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding InstructionPrism}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
+                              ItemsPanel="{StaticResource Companion.WrapPanel}" Margin="0,4,0,0"
+                              Visibility="{Binding HasInstructionPrism, Converter={StaticResource BoolToVisibility}}" />
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding HasInstructionDesired, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Text="Aim for" Style="{StaticResource Companion.Text.Muted}" VerticalAlignment="Center" />
+                    <Border Style="{StaticResource Companion.Tag.Gold}" Padding="10,3">
+                        <TextBlock Text="{Binding InstructionDesired}" FontSize="13" FontWeight="SemiBold" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="{Binding Summary}" Style="{StaticResource Companion.Text.Muted}" Margin="0,10,0,0"
+                       Visibility="{Binding ShowSummary, Converter={StaticResource BoolToVisibility}}" />
+
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0" Visibility="{Binding ShowTargetTag, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Aim for" Style="{StaticResource Companion.Text.Muted}" VerticalAlignment="Center" />
+                <Border Style="{StaticResource Companion.Tag.Gold}" Padding="10,3">
+                    <TextBlock Text="{Binding TargetStat}" FontSize="13" FontWeight="SemiBold" />
+                </Border>
+            </StackPanel>
+
+            <!-- Unknowns first: each must be answered in-game before the step is worth spending on. -->
+            <Border Style="{StaticResource Companion.Callout.Warning}" Margin="0,12,0,0" Visibility="{Binding NeedsInGameCheck, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="Look in the game, then answer each one. Don't spend anything yet." Style="{StaticResource Companion.Text}" FontSize="13" />
+                    <ItemsControl ItemsSource="{Binding InGameCheckRows}" Margin="0,8,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource Companion.Text}" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0">
+                                        <Run x:Name="Mark" Text="?" Foreground="{StaticResource Companion.Brush.Warning}" FontWeight="SemiBold" /> <Run Text="{Binding Text, Mode=OneWay}" />
+                                    </TextBlock>
+                                    <StackPanel x:Name="Answers" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Button Content="Yes" Style="{StaticResource Companion.Button.Secondary}" Padding="10,3"
+                                                Command="{Binding DataContext.ConfirmCheckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                        <Button Content="No" Style="{StaticResource Companion.Button.Link}" Margin="8,0,0,0"
+                                                ToolTip="Not possible in-game. The step (or the goal, for the slot check) is ruled out for this item and saved in its history."
+                                                Command="{Binding DataContext.RejectCheckCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                        <Setter TargetName="Mark" Property="Text" Value="&#x2713;" />
+                                        <Setter TargetName="Mark" Property="Foreground" Value="{StaticResource Companion.Brush.Success}" />
+                                        <Setter TargetName="Answers" Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- After crafting, rescanning is the main thing to do. Saving stays secondary. -->
+            <Border Style="{StaticResource Companion.Callout.Info}" Margin="0,12,0,0" Visibility="{Binding ShowCraftAction, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,0,0,6"
+                               Visibility="{Binding HasCheckedInGame, Converter={StaticResource BoolToVisibility}}">
+                        <Run Text="&#x2713;" Foreground="{StaticResource Companion.Brush.Success}" /> <Run Text="You checked this option in-game." />
+                    </TextBlock>
+                    <TextBlock Text="Craft in game, then hover the item and rescan." Style="{StaticResource Companion.Text}" FontSize="13" />
+                    <Button Content="Rescan item" Command="{Binding RescanAfterCraftingCommand}" Style="{StaticResource Companion.Button.Primary}"
+                            HorizontalAlignment="Left" Margin="0,8,0,0"
+                            ToolTip="Hover over the crafted item in-game first. The new scan replaces the old one and the plan updates." />
+                    <Button Command="{Binding PasteRescanCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,6,0,0"
+                            ToolTip="Take a screenshot of the crafted item's tooltip (Win+Shift+S), then press this.">
+                        <TextBlock Text="Or paste a screenshot of it" FontSize="12" />
+                    </Button>
+                </StackPanel>
+            </Border>
+            <Button Command="{Binding SaveCommand}" Style="{StaticResource Companion.Button.Link}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    Visibility="{Binding ShowSaveAction, Converter={StaticResource BoolToVisibility}}"
+                    ToolTip="Saves this item to My Gear without crafting. Rescanning saves it too.">
+                <TextBlock Text="Save to My Gear" FontSize="12" />
+            </Button>
+
+            <StackPanel Visibility="{Binding ShowRecommendation, Converter={StaticResource BoolToVisibility}}" Margin="0,12,0,0">
+
+                <!-- Why this step: what was checked, and what only the game can confirm. -->
+                <Expander Style="{StaticResource Companion.Expander}" Header="Why this step"
+                          Visibility="{Binding HasInstruction, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding InstructionReason}" Style="{StaticResource Companion.Text.Muted}" />
+                        <StackPanel Margin="0,10,0,0" Visibility="{Binding HasInstructionChecked, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Checked" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
+                            <ItemsControl ItemsSource="{Binding InstructionChecked}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
+                                            <Run Text="&#x2713;" Foreground="{StaticResource Companion.Brush.Success}" /> <Run Text="{Binding Mode=OneWay}" />
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <TextBlock Text="{Binding InstructionCaveat}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,10,0,0"
+                                   Foreground="{StaticResource Companion.Brush.Warning}"
+                                   Visibility="{Binding HasInstructionCaveat, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Expander>
+
+                <Expander Style="{StaticResource Companion.Expander}" Header="Details" Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <StackPanel Margin="0,0,0,10" Visibility="{Binding HasKeep, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Keep" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Success}" />
+                            <TextBlock Text="{Binding KeepText}" Style="{StaticResource Companion.Text.Muted}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,10" Visibility="{Binding HasReplace, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Replace" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Danger}" />
+                            <TextBlock Text="{Binding ReplaceText}" Style="{StaticResource Companion.Text.Muted}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,10" Visibility="{Binding HasTarget, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Missing from your build" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Gold}" />
+                            <TextBlock Text="{Binding TargetText}" Style="{StaticResource Companion.Text.Muted}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,10" Visibility="{Binding HasImprove, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Below your target" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Companion.Brush.Warning}" />
+                            <TextBlock Text="{Binding ImproveText}" Style="{StaticResource Companion.Text.Muted}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,0,0,10" Visibility="{Binding HasProtected, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Protected" Style="{StaticResource Companion.Text}" FontSize="13" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding ProtectedText}" Style="{StaticResource Companion.Text.Muted}" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding ReplaceNote}" Style="{StaticResource Companion.Text.Muted}" FontSize="12"
+                                   Visibility="{Binding HasReplaceNote, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+                </Expander>
+
+                <Expander Style="{StaticResource Companion.Expander}" Header="Prism hints" Visibility="{Binding HasPrismHints, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding PrismHints}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding AffixName}" Style="{StaticResource Companion.Text}" FontSize="13" />
+                                        <ItemsControl ItemsSource="{Binding Prisms}" ItemTemplate="{StaticResource Companion.PrismChipTemplate}"
+                                                      ItemsPanel="{StaticResource Companion.WrapPanel}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="A prism narrows the result to a category. It does not guarantee a specific affix."
+                                   Style="{StaticResource Companion.Text.Muted}" FontSize="12" />
+                    </StackPanel>
+                </Expander>
+
+                <Expander Style="{StaticResource Companion.Expander}" Header="Before you spend" Visibility="{Binding HasInGameChecks, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding InGameChecks}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,2">
+                                    <Run Text="•" /> <Run Text="{Binding Mode=OneWay}" />
+                                </TextBlock>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Expander>
+
+                <Expander Style="{StaticResource Companion.Expander}" Header="About this advice">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Companion.Text.Muted}">
+                            <Run Text="Build match: " FontWeight="SemiBold" /><Run Text="{Binding BuildMatchStatement, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,6,0,0">
+                            <Run Text="Item quality: " FontWeight="SemiBold" /><Run Text="{Binding ItemQualityStatement, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock Style="{StaticResource Companion.Text.Muted}" Margin="0,6,0,0">
+                            <Run Text="Damage: " FontWeight="SemiBold" /><Run Text="{Binding DamageStatement, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Expander>
+
+                <CheckBox IsChecked="{Binding IncludeGreaterAffixes}" Margin="0,10,0,0"
+                          ToolTip="Greater affixes are protected by default, because they are valuable. Tick this to let the advisor suggest replacing them.">
+                    <TextBlock Text="Include greater affixes in suggestions" Style="{StaticResource Companion.Text.Muted}" />
+                </CheckBox>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

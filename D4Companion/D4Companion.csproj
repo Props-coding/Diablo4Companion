@@ -203,6 +203,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\D4Companion.Constants\D4Companion.Constants.csproj" />
+    <ProjectReference Include="..\D4Companion.Crafting\D4Companion.Crafting.csproj" />
     <ProjectReference Include="..\D4Companion.Entities\D4Companion.Entities.csproj" />
     <ProjectReference Include="..\D4Companion.Extensions\D4Companion.Extensions.csproj" />
     <ProjectReference Include="..\D4Companion.Interfaces\D4Companion.Interfaces.csproj" />
