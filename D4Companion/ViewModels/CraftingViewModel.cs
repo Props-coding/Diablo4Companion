@@ -140,6 +140,9 @@ namespace D4Companion.ViewModels
             RejectCheckCommand = new RelayCommand<InGameCheckRowViewModel>(RejectCheck);
             ClearRuledOutCommand = new RelayCommand(() => SetCraftState(_craftState with { RuledOut = Array.Empty<RuledOutStep>() }));
             CopyTrialLogCommand = new RelayCommand(CopyTrialLog);
+            PasteScreenshotCommand = new RelayCommand(() => PasteScreenshot(rescan: false));
+            PasteRescanCommand = new RelayCommand(() => PasteScreenshot(rescan: true));
+            _state.ScreenshotRead += (s, snapshot) => OnScreenshotRead(snapshot);
 
             LoadAffixCatalog();
             RefreshPresets();
@@ -163,6 +166,8 @@ namespace D4Companion.ViewModels
         public ICommand RejectCheckCommand { get; }
         public ICommand ClearRuledOutCommand { get; }
         public ICommand CopyTrialLogCommand { get; }
+        public ICommand PasteScreenshotCommand { get; }
+        public ICommand PasteRescanCommand { get; }
 
         // Build selection
 
@@ -629,13 +634,18 @@ namespace D4Companion.ViewModels
         {
             var live = _state.LiveScan;
             if (live == null) return;
+            CaptureFrom(live, "Scan captured. This copy will not change when you hover over other items.");
+        }
+
+        private void CaptureFrom(GearSnapshot live, string message)
+        {
 
             ResetTrialState();
             _currentRecordId = null;
             _isAfterCraftingDraft = false;
             LoadSnapshot(live);
             HasUnsavedChanges = true;
-            StatusMessage = "Scan captured. This copy will not change when you hover over other items.";
+            StatusMessage = message;
             RefreshHistory();
         }
 
@@ -643,6 +653,12 @@ namespace D4Companion.ViewModels
         {
             var live = _state.LiveScan;
             if (live == null || !HasItem) return;
+            RescanFrom(live);
+        }
+
+        private void RescanFrom(GearSnapshot live)
+        {
+            if (!HasItem) return;
 
             // Rescanning needs a saved item to compare with. Save it first when it isn't saved yet.
             if (_currentRecordId == null || HasUnsavedChanges)
@@ -721,6 +737,57 @@ namespace D4Companion.ViewModels
 
             note = " Mark which affix you enchanted under Crafting limits.";
             return state;
+        }
+
+        // Screenshot paste: read the item from an image on the clipboard instead of the live game window.
+
+        private enum PasteIntent { None, Capture, Rescan }
+        private PasteIntent _pasteIntent = PasteIntent.None;
+
+        public bool IsReadingScreenshot => _pasteIntent != PasteIntent.None;
+
+        private void PasteScreenshot(bool rescan)
+        {
+            if (_pasteIntent != PasteIntent.None) return;
+
+            System.Drawing.Bitmap? image;
+            try
+            {
+                image = ClipboardImage.Read();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name);
+                image = null;
+            }
+
+            if (image == null)
+            {
+                StatusMessage = "There's no picture on the clipboard. In the game, hover the item, press Win+Shift+S, drag around the item's tooltip, then paste.";
+                return;
+            }
+
+            _pasteIntent = rescan && HasItem ? PasteIntent.Rescan : PasteIntent.Capture;
+            OnPropertyChanged(nameof(IsReadingScreenshot));
+            StatusMessage = "Reading the screenshot...";
+            _state.ReadScreenshot(image);
+        }
+
+        private void OnScreenshotRead(GearSnapshot? snapshot)
+        {
+            var intent = _pasteIntent;
+            _pasteIntent = PasteIntent.None;
+            OnPropertyChanged(nameof(IsReadingScreenshot));
+            if (intent == PasteIntent.None) return;
+
+            if (snapshot == null)
+            {
+                StatusMessage = "No item tooltip was found in the screenshot. Include the whole tooltip, from the item name to the bottom edge, and take it at your normal game resolution.";
+                return;
+            }
+
+            if (intent == PasteIntent.Rescan) RescanFrom(snapshot);
+            else CaptureFrom(snapshot, "Read from your screenshot. Check every value against the game, then confirm.");
         }
 
         private void ResetTrialState()

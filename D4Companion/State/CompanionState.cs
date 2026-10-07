@@ -69,6 +69,7 @@ namespace D4Companion.State
             BuildTarget = CreateBuildTarget();
 
             WeakReferenceMessenger.Default.Register<TooltipDataReadyMessage>(this, HandleTooltipDataReadyMessage);
+            WeakReferenceMessenger.Default.Register<ScreenshotProcessedMessage>(this, HandleScreenshotProcessedMessage);
             WeakReferenceMessenger.Default.Register<ToggleOverlayFromGUIMessage>(this, (r, m) => OnUiThread(() =>
             {
                 IsScannerOn = m.Value.IsEnabled;
@@ -89,6 +90,8 @@ namespace D4Companion.State
         }
 
         public event EventHandler? LiveScanChanged;
+        /// <summary>A pasted screenshot was read. The snapshot is null when no gear tooltip was found.</summary>
+        public event EventHandler<GearSnapshot?>? ScreenshotRead;
         public event EventHandler? ScannerStateChanged;
         public event EventHandler? BuildTargetChanged;
         public event EventHandler? GearChanged;
@@ -266,6 +269,29 @@ namespace D4Companion.State
             {
                 _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name);
             }
+        }
+
+        /// <summary>
+        /// Reads an item from a screenshot instead of the live game window. The answer arrives as ScreenshotRead.
+        /// Takes ownership of the bitmap.
+        /// </summary>
+        public void ReadScreenshot(System.Drawing.Bitmap screenshot)
+        {
+            WeakReferenceMessenger.Default.Send(new ProcessScreenshotRequestedMessage(screenshot));
+        }
+
+        private void HandleScreenshotProcessedMessage(object recipient, ScreenshotProcessedMessage message)
+        {
+            GearSnapshot? snapshot = null;
+            try
+            {
+                snapshot = MapTooltip(message.Tooltip);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, MethodBase.GetCurrentMethod()?.Name);
+            }
+            OnUiThread(() => ScreenshotRead?.Invoke(this, snapshot));
         }
 
         private GearSnapshot? MapTooltip(ItemTooltipDescriptor? tooltip)

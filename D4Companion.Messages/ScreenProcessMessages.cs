@@ -104,6 +104,24 @@ namespace D4Companion.Messages
         public OcrResultItemType OcrResultItemType { get; set; } = new();
     }
 
+    /// <summary>
+    /// Read an item from a screenshot the player pasted, instead of from the live game window.
+    /// The handler owns the bitmap and disposes it.
+    /// </summary>
+    public class ProcessScreenshotRequestedMessage(Bitmap screenshot)
+    {
+        public Bitmap Screenshot { get; } = screenshot;
+    }
+
+    /// <summary>
+    /// The result of reading a pasted screenshot. Tooltip is empty when no item tooltip was found.
+    /// Sent instead of TooltipDataReadyMessage, so the live overlay is not affected.
+    /// </summary>
+    public class ScreenshotProcessedMessage(ItemTooltipDescriptor tooltip)
+    {
+        public ItemTooltipDescriptor Tooltip { get; } = tooltip;
+    }
+
     public class TooltipDataReadyMessage(TooltipDataReadyMessageParams tooltipDataReadyMessageParams) : ValueChangedMessage<TooltipDataReadyMessageParams>(tooltipDataReadyMessageParams)
     {
     }

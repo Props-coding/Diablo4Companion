@@ -41,6 +41,9 @@ namespace D4Companion.Services
         private string _previousItemType = string.Empty;        
         private int _previousItemPower = 0;
         private Task? _processTask = null;
+        // While a pasted screenshot is read, live captures are skipped and the whole image is searched.
+        private volatile bool _isReadingScreenshot = false;
+        private volatile bool _screenshotAnswered = false;
         private bool _updateAvailableImages = false;
         private bool _updateBrightnessThreshold = false;
 
@@ -64,6 +67,7 @@ namespace D4Companion.Services
             WeakReferenceMessenger.Default.Register<AvailableImagesChangedMessage>(this, HandleAvailableImagesChangedMessage);
             WeakReferenceMessenger.Default.Register<BrightnessThresholdChangedMessage>(this, HandleBrightnessThresholdChangedMessage);
             WeakReferenceMessenger.Default.Register<ScreenCaptureReadyMessage>(this, HandleScreenCaptureReadyMessage);
+            WeakReferenceMessenger.Default.Register<ProcessScreenshotRequestedMessage>(this, HandleProcessScreenshotRequestedMessage);
             WeakReferenceMessenger.Default.Register<SystemPresetChangedMessage>(this, HandleSystemPresetChangedMessage);
             WeakReferenceMessenger.Default.Register<ToggleOverlayMessage>(this, HandleToggleOverlayMessage);
             WeakReferenceMessenger.Default.Register<ToggleOverlayFromGUIMessage>(this, HandleToggleOverlayFromGUIMessage);
@@ -114,6 +118,7 @@ namespace D4Companion.Services
 
             bool doDispose = false;
             if (!IsEnabled) doDispose = true;
+            if (_isReadingScreenshot) doDispose = true;
             if (_processTask != null && (_processTask.Status.Equals(TaskStatus.Running) || _processTask.Status.Equals(TaskStatus.WaitingForActivation))) doDispose = true;
 
             if (doDispose)
@@ -146,6 +151,32 @@ namespace D4Companion.Services
                 screenCaptureReadyMessageParams.CurrentScreen = null;
 
                 Thread.Sleep(_settingsManager.Settings.OverlayUpdateDelay);
+            });
+        }
+
+        private void HandleProcessScreenshotRequestedMessage(object recipient, ProcessScreenshotRequestedMessage message)
+        {
+            var screenshot = message.Screenshot;
+            Task.Run(() =>
+            {
+                _isReadingScreenshot = true;
+                _screenshotAnswered = false;
+                try
+                {
+                    // Let a live capture that is already running finish first. They share the tooltip state.
+                    try { _processTask?.Wait(TimeSpan.FromSeconds(5)); } catch (Exception) { }
+                    ProcessScreen(screenshot);
+                    // Always answer, also when the image was too small or reading failed.
+                    if (!_screenshotAnswered)
+                    {
+                        WeakReferenceMessenger.Default.Send(new ScreenshotProcessedMessage(new ItemTooltipDescriptor()));
+                    }
+                }
+                finally
+                {
+                    screenshot.Dispose();
+                    _isReadingScreenshot = false;
+                }
             });
         }
 
@@ -342,6 +373,8 @@ namespace D4Companion.Services
 
                 if (currentScreen.Height < 100)
                 {
+                    if (_isReadingScreenshot) return;
+
                     //_logger.LogWarning($"{MethodBase.GetCurrentMethod()?.Name}: Diablo IV window is probably minimized.");
 
                     // Publish empty tooltip to clear overlay.
@@ -502,10 +535,18 @@ namespace D4Companion.Services
 
                 _currentTooltip.PerformanceResults["Total"] = (int)elapsedMs;
 
-                WeakReferenceMessenger.Default.Send(new TooltipDataReadyMessage(new TooltipDataReadyMessageParams
+                if (_isReadingScreenshot)
                 {
-                    Tooltip = _currentTooltip
-                }));
+                    _screenshotAnswered = true;
+                    WeakReferenceMessenger.Default.Send(new ScreenshotProcessedMessage(_currentTooltip));
+                }
+                else
+                {
+                    WeakReferenceMessenger.Default.Send(new TooltipDataReadyMessage(new TooltipDataReadyMessageParams
+                    {
+                        Tooltip = _currentTooltip
+                    }));
+                }
 
                 _logger.LogDebug($"{MethodBase.GetCurrentMethod()?.Name}: Tooltip data ready:");
                 _logger.LogDebug($"{MethodBase.GetCurrentMethod()?.Name}:    Item type: {_currentTooltip.ItemType}");
@@ -568,7 +609,9 @@ namespace D4Companion.Services
             scanPosX = Math.Max(0, _mouseCoordsX - (scanWidth / 2));
             scanPosX = scanPosX + scanWidth >= currentScreenBitmap.Width ? currentScreenBitmap.Width - scanWidth : scanPosX;
             var currentScreenSource = currentScreenBitmap.ToImage<Bgr, byte>();
-            var currentScreen = _settingsManager.Settings.ControllerMode ? currentScreenSource.Clone() : currentScreenSource.Copy(new Rectangle(scanPosX, scanPosY, scanWidth, scanHeigth));
+            // A pasted screenshot has no mouse position, so the whole image is searched.
+            bool wholeImage = _settingsManager.Settings.ControllerMode || _isReadingScreenshot;
+            var currentScreen = wholeImage ? currentScreenSource.Clone() : currentScreenSource.Copy(new Rectangle(scanPosX, scanPosY, scanWidth, scanHeigth));
 
             // Handle window resize issues
             if (currentScreen.Width == 1) return false;
@@ -599,8 +642,8 @@ namespace D4Companion.Services
                 if (itemTooltip.Location.IsEmpty) continue;
 
                 _currentTooltip.Location = itemTooltip.Location;
-                _currentTooltip.OffsetX = _settingsManager.Settings.ControllerMode ? 0 : scanPosX;
-                _currentTooltip.OffsetY = _settingsManager.Settings.ControllerMode ? 0 : scanPosY;
+                _currentTooltip.OffsetX = wholeImage ? 0 : scanPosX;
+                _currentTooltip.OffsetY = wholeImage ? 0 : scanPosY;
 
                 if (IsDebugInfoEnabled)
                 {

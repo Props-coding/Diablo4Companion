@@ -15,6 +15,10 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </UserControl.Resources>
 
+    <UserControl.InputBindings>
+        <KeyBinding Key="V" Modifiers="Control" Command="{Binding PasteScreenshotCommand}" />
+    </UserControl.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -39,6 +43,8 @@
                         ToolTip="The scanner only reads items while it is on." />
                 <Button Content="Capture new scan" Command="{Binding CaptureScanCommand}" Style="{StaticResource Companion.Button.Secondary}"
                         ToolTip="Save a copy of the item the scanner is reading right now. The copy will not change when you move the mouse." />
+                <Button Content="Paste screenshot" Command="{Binding PasteScreenshotCommand}" Style="{StaticResource Companion.Button.Secondary}" Margin="10,0,0,0"
+                        ToolTip="In the game, hover the item, press Win+Shift+S and drag around its tooltip. Then press this (or Ctrl+V here)." />
             </StackPanel>
         </Grid>
 
@@ -99,7 +105,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="Turn the scanner on, hover over a piece of gear in Diablo IV, then press Capture scan."
+                            <TextBlock Text="Turn the scanner on, hover over a piece of gear in Diablo IV, then press Capture scan. Or take a screenshot of the item's tooltip (Win+Shift+S) and press Paste screenshot."
                                        Style="{StaticResource Companion.Text.Muted}" Margin="0,14,0,0"
                                        Visibility="{Binding HasItem, Converter={x:Static converters:InverseBooleanToVisibilityConverter.Instance}}" />
                             <TextBlock Text="{Binding LiveScanText}" Style="{StaticResource Companion.Text.Muted}" FontSize="12" Margin="0,6,0,0"
